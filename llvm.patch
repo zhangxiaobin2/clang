@@ -1,0 +1,140 @@
+Index: include/llvm/ADT/APFloat.h
+===================================================================
+--- include/llvm/ADT/APFloat.h	(revision 203555)
++++ include/llvm/ADT/APFloat.h	(working copy)
+@@ -145,10 +145,10 @@
+ 
+   /// IEEE-754R 5.11: Floating Point Comparison Relations.
+   enum cmpResult {
+-    cmpLessThan,
+-    cmpEqual,
+-    cmpGreaterThan,
+-    cmpUnordered
++    cmpLessThan = 0x01,
++    cmpEqual = 0x02,
++    cmpGreaterThan = 0x04,
++    cmpUnordered = 0x08
+   };
+ 
+   /// IEEE-754R 4.3: Rounding-direction attributes.
+@@ -341,7 +341,17 @@
+   /// IEEE comparison with another floating point number (NaNs compare
+   /// unordered, 0==-0).
+   cmpResult compare(const APFloat &) const;
++  cmpResult compareWithConversion(const APFloat &) const;
+ 
++
++  static const APFloat& max(const APFloat &Lhs, const APFloat &Rhs) {
++    return Lhs.compareWithConversion(Rhs) == cmpGreaterThan ? Lhs : Rhs;
++  }
++
++  static const APFloat& min(const APFloat &Lhs, const APFloat &Rhs) {
++    return Lhs.compareWithConversion(Rhs) == cmpLessThan ? Lhs : Rhs;
++  }
++
+   /// Bitwise comparison for equality (QNaNs compare equal, 0!=-0).
+   bool bitwiseIsEqual(const APFloat &) const;
+ 
+Index: include/llvm/ADT/APSInt.h
+===================================================================
+--- include/llvm/ADT/APSInt.h	(revision 203555)
++++ include/llvm/ADT/APSInt.h	(working copy)
+@@ -119,6 +119,57 @@
+     return *this;
+   }
+ 
++  /// Integral Comparison Relations.
++  enum cmpResult {
++    cmpLessThan = 0x1,
++    cmpEqual = 0x2,
++    cmpGreaterThan = 0x4
++  };
++
++  // This function compares two APSInts regardless of signedness or bitwidth.
++  cmpResult compare(const APSInt &RHS) const {
++    cmpResult result;
++    APSInt InnerLhs = *this, InnerRhs = RHS;
++    // If bitwidths are different, extend APSInt with the smallest bitwidth to
++    // the biggest bitwidth.
++    if (InnerLhs.getBitWidth() > InnerRhs.getBitWidth())
++      InnerRhs = InnerRhs.extend(InnerLhs.getBitWidth());
++    else if (InnerLhs.getBitWidth() < InnerRhs.getBitWidth())
++      InnerLhs = InnerLhs.extend(InnerRhs.getBitWidth());
++
++    // If signednesses are different, overloaded operators cannot be used.
++    // Handle this case separately.
++    if (InnerLhs.IsUnsigned != InnerRhs.IsUnsigned) {
++      // There are one unsigned APSInt and one signed. If signed APSInt is
++      // positive, just convert it to the type of unsigned APSInt and compare
++      // again. Otherwise, unsigned APSInt is greater.
++      if ((InnerLhs.isSigned() && InnerLhs.isNonNegative()) ||
++          (InnerRhs.isSigned() && InnerRhs.isNonNegative()))
++        result = InnerLhs.IsUnsigned ? compare(APSInt(InnerRhs, true))
++                                     : APSInt(InnerLhs, true).compare(InnerRhs);
++      else
++        result = InnerLhs.isNegative() ? cmpLessThan : cmpGreaterThan;
++    }
++    // Both APSInts have the same bitwidth and signedness and can be compared by
++    // overloaded operators.
++    else if (InnerLhs == InnerRhs)
++      result = cmpEqual;
++    else if (InnerLhs < InnerRhs)
++      result = cmpLessThan;
++    else
++      result = cmpGreaterThan;
++
++    return result;
++  }
++
++  static const APSInt& max(const APSInt &Lhs, const APSInt &Rhs) {
++    return Lhs.compare(Rhs) == cmpGreaterThan ? Lhs : Rhs;
++  }
++
++  static const APSInt& min(const APSInt &Lhs, const APSInt &Rhs) {
++    return Lhs.compare(Rhs) == cmpLessThan ? Lhs : Rhs;
++  }
++
+   inline bool operator<(const APSInt& RHS) const {
+     assert(IsUnsigned == RHS.IsUnsigned && "Signedness mismatch!");
+     return IsUnsigned ? ult(RHS) : slt(RHS);
+Index: include/llvm/ADT/ImmutableList.h
+===================================================================
+--- include/llvm/ADT/ImmutableList.h	(revision 203555)
++++ include/llvm/ADT/ImmutableList.h	(working copy)
+@@ -194,7 +194,7 @@
+   }
+ 
+   ImmutableList<T> create(const T& X) {
+-    return Concat(X, getEmptyList());
++    return concat(X, getEmptyList());
+   }
+ };
+ 
+Index: lib/Support/APFloat.cpp
+===================================================================
+--- lib/Support/APFloat.cpp	(revision 203555)
++++ lib/Support/APFloat.cpp	(working copy)
+@@ -1856,6 +1856,23 @@
+ 
+ /* Comparison requires normalized numbers.  */
+ APFloat::cmpResult
++APFloat::compareWithConversion(const APFloat &rhs) const {
++  if (semantics == rhs.semantics)
++    return compare(rhs);
++  bool losesInfo;
++  if (semanticsPrecision(*semantics) < semanticsPrecision(rhs.getSemantics())) {
++    APFloat tmp1(*this);
++    tmp1.convert(rhs.getSemantics(), rmNearestTiesToEven, &losesInfo);
++    return tmp1.compare(rhs);
++  } else {
++    APFloat tmp2(rhs);
++    tmp2.convert(*semantics,rmNearestTiesToEven, &losesInfo);
++    return compare(tmp2);
++  }
++}
++
++/* Comparison requires normalized numbers.  */
++APFloat::cmpResult
+ APFloat::compare(const APFloat &rhs) const
+ {
+   cmpResult result;

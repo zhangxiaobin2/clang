@@ -297,6 +297,8 @@ protected:
 
   friend class ASTDeclWriter;
   friend class ASTDeclReader;
+  friend class ASTImporter;
+  friend class ASTNodeImporter;
   friend class ASTReader;
   friend class LinkageComputer;
 
@@ -404,6 +406,8 @@ public:
   }
 
   bool isInAnonymousNamespace() const;
+
+  bool isInStdNamespace() const;
 
   ASTContext &getASTContext() const LLVM_READONLY;
 
@@ -1135,6 +1139,8 @@ public:
   bool isNamespace() const {
     return DeclKind == Decl::Namespace;
   }
+
+  bool isStdNamespace() const;
 
   bool isInlineNamespace() const;
 

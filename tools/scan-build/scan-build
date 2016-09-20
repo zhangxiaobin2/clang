@@ -1475,7 +1475,7 @@ while (@ARGV) {
   
   if ($arg eq "-plist") {
     shift @ARGV;
-    $OutputFormat = "plist";
+    $OutputFormat = "plist-multi-file";
     next;
   }
   if ($arg eq "-plist-html") {

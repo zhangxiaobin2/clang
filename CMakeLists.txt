@@ -1,3 +1,4 @@
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 # If we are not building as a part of LLVM, build Clang as an
 # standalone project, using LLVM as an external library:
 if( CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR )

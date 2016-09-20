@@ -36,6 +36,7 @@ class StackFrameContext;
 class BlockInvocationContext;
 class AnalysisDeclContextManager;
 class LocationContext;
+class ASTImporter;
 
 namespace idx { class TranslationUnit; }
 
@@ -59,6 +60,14 @@ public:
   // which creates the analysis object given an AnalysisDeclContext.
 };
 
+
+struct CallDeclPair {
+  CallDeclPair(const FunctionDecl *CalleeD, const FunctionDecl *TargetD):
+    CalleeDecl(CalleeD), TargetDecl(TargetD) {}
+  CallDeclPair() {}
+  const FunctionDecl *CalleeDecl;
+  const FunctionDecl *TargetDecl;
+};
 
 /// AnalysisDeclContext contains the context data for the function or method
 /// under analysis.
@@ -192,6 +201,10 @@ public:
     }
     return static_cast<T*>(data);
   }
+
+  /// Returns true if the root namespace of the given declaration is the 'std'
+  /// C++ namespace.
+  static bool isInStdNamespace(const Decl *D);
 private:
   ManagedAnalysis *&getAnalysisImpl(const void* tag);
 

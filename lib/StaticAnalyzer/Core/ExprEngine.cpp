@@ -55,11 +55,14 @@ STATISTIC(NumTimesRetriedWithoutInlining,
 // Engine construction and deletion.
 //===----------------------------------------------------------------------===//
 
-ExprEngine::ExprEngine(AnalysisManager &mgr, bool gcEnabled,
-                       SetOfConstDecls *VisitedCalleesIn,
-                       FunctionSummariesTy *FS,
+ExprEngine::ExprEngine(CompilerInstance &CI, AnalysisManager &mgr,
+//                       BasicValueFactory &BVF,
+                       bool gcEnabled, SetOfConstDecls *VisitedCalleesIn,
+                       FunctionSummariesTy *FS, 
+//CallSummaryMap *FCS,
+//                       SummaryConstructionStack &SCS,
                        InliningModes HowToInlineIn)
-  : AMgr(mgr),
+  : CI(CI),AMgr(mgr),
     AnalysisDeclContexts(mgr.getAnalysisDeclContextManager()),
     Engine(*this, FS),
     G(Engine.getGraph()),
