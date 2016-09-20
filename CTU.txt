@@ -1,0 +1,12 @@
+This is a fork of Samsung cross translational unit analysis patch on clang
+
+
+How to run Cross Translational Unit analysis
+
+export CLANG_PATH=(path to clang dir not to clang itself)
+put xtu-build, xtu-analyze in path (scripts in clang/tools/scan-build/)
+invoke xtu-build.py make_cmd 
+    invoke xtu-analyze.py wiht xtu dir(.xtu one), output dir (xtu dir contains the build commands
+E.g: 
+time xtu-build.py make
+xtu-analyze.py --output-dir=out --xtu-dir .xtu --processes 1
