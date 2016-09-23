@@ -572,7 +572,10 @@ void AnalysisConsumer::HandleDeclsCallGraph(const unsigned LocalTUDeclsSize) {
   SetOfConstDecls Visited;
   SetOfConstDecls VisitedAsTopLevel;
 
-
+  //ednikru
+  //visitedFunc.txt collects all functions that were
+  //inlinded as callee or top level caller
+  //these functions will not be visited as top level nodes
   std::set<std::string> VisitedAsXTU;
   std::string VisitedFuncSetFile;
   const char *BuildDir = getExplicitBuildDir();
