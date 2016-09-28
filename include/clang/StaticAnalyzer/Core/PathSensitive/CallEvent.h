@@ -165,6 +165,10 @@ private:
   void Release() const;
 
 protected:
+  typedef std::map<std::string, std::string> FunctionFileMapping;
+  typedef std::map<std::string, clang::ASTUnit*> FunctionAstUnitMapping;
+  typedef std::map<std::string, clang::ASTUnit*> FileASTUnitMapping;
+
   friend class CallEventManager;
 
   CallEvent(const Expr *E, ProgramStateRef state, const LocationContext *lctx)
@@ -384,6 +388,11 @@ public:
   // Iterator access to formal parameters and their types.
 private:
   typedef std::const_mem_fun_t<QualType, ParmVarDecl> get_type_fun;
+  
+protected:
+  static FileASTUnitMapping FileASTUnitMap;
+  static FunctionAstUnitMapping FunctionAstUnitMap;
+  static FunctionFileMapping FunctionFileMap;
 
 public:
   /// Return call's formal parameters.
@@ -436,7 +445,9 @@ public:
     return cast<FunctionDecl>(CallEvent::getDecl());
   }
 
-  RuntimeDefinition getRuntimeDefinition() const override {
+  RuntimeDefinition getRuntimeDefinition() const override;
+/*XTU This is implemented in CallEvent.cpp
+ {
     const FunctionDecl *FD = getDecl();
     // Note that the AnalysisDeclContext will have the FunctionDecl with
     // the definition (if one exists).
@@ -450,7 +461,7 @@ public:
 
     return RuntimeDefinition();
   }
-
+*/
   bool argumentsMayEscape() const override;
 
   void getInitialStackFrameContents(const StackFrameContext *CalleeCtx,
