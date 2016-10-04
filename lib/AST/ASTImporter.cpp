@@ -3142,6 +3142,8 @@ Decl *ASTNodeImporter::VisitEnumConstantDecl(EnumConstantDecl *D) {
   DeclarationName Name;
   SourceLocation Loc;
   NamedDecl *ToD;
+  const FunctionDecl *FoundWithoutBody = NULL;
+
   if (ImportDeclParts(D, DC, LexicalDC, Name, ToD, Loc))
     return nullptr;
   if (ToD)
@@ -3223,6 +3225,15 @@ Decl *ASTNodeImporter::VisitFunctionDecl(FunctionDecl *D) {
           if (Importer.IsStructurallyEquivalent(D->getType(), 
                                                 FoundFunction->getType())) {
             // FIXME: Actually try to merge the body and other attributes.
+            //ednikru-CTU
+        	  const FunctionDecl *FromBodyDecl = NULL;
+              D->hasBody(FromBodyDecl);
+              if (D == FromBodyDecl && !FoundFunction->hasBody()) {
+                // This function is needed to merge completely.
+                FoundWithoutBody = FoundFunction;
+                llvm::errs()<<"Found function without body\n";
+                break;
+              }
             return Importer.Imported(D, FoundFunction);
           }
         
@@ -3382,6 +3393,7 @@ Decl *ASTNodeImporter::VisitFunctionDecl(FunctionDecl *D) {
   }
 
   // Import the body, if any.
+  llvm::errs()<<"Importing body\n";
   if (Stmt *FromBody = D->getBody()) {
     if (Stmt *ToBody = Importer.Import(FromBody)) {
       ToFunction->setBody(ToBody);
@@ -6931,15 +6943,22 @@ Decl *ASTImporter::Import(Decl *FromD) {
   ASTNodeImporter Importer(*this);
 
   // Check whether we've already imported this declaration.  
-  llvm::DenseMap<Decl *, Decl *>::iterator Pos = ImportedDecls.find(FromD);
+  /*
+   * TODO: CTU check how to re-enable this
+   * llvm::DenseMap<Decl *, Decl *>::iterator Pos = ImportedDecls.find(FromD);
   if (Pos != ImportedDecls.end()) {
     Decl *ToD = Pos->second;
     Importer.ImportDefinitionIfNeeded(FromD, ToD);
+    llvm::errs()<<"ASTImporter::Import Declaration already found\n";
     return ToD;
-  }
+  }*/
   
   // Import the type
+  //llvm::errs()<<"ASTImporter::importing from:\n";
+  //FromD->dump();
   Decl *ToD = Importer.Visit(FromD);
+  //llvm::errs()<<"ASTImporter::Import imported:\n";
+  //ToD->dump();
   if (!ToD)
     return nullptr;
 
