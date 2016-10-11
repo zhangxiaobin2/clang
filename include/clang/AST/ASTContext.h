@@ -72,8 +72,6 @@
 #include <utility>
 #include <vector>
 
-
-
 namespace llvm {
 
 struct fltSemantics;
