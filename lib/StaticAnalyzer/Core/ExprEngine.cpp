@@ -1514,6 +1514,8 @@ static void processCoverageInfo(const CFGBlock &Block, SourceManager &SM,
     if (SM.isInSystemHeader(SpellingStartLoc))
       return;
     FileID FID = SM.getFileID(SpellingStartLoc);
+    if (FID.isInvalid())
+      continue;
     if (FE) {
       if (FE != SM.getFileEntryForID(FID))
         continue;
