@@ -65,7 +65,5 @@ add_clang_library(clangAST
 
   LINK_LIBS
   clangBasic
-  clangFrontend
   clangLex
-  clangStaticAnalyzerCore
   )
