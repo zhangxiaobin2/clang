@@ -40,6 +40,7 @@
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Allocator.h"
+#include <functional>
 #include <memory>
 #include <vector>
 
@@ -1859,8 +1860,10 @@ private:
   ASTImporter &getOrCreateASTImporter(ASTContext &From);
 
 public:
-  const FunctionDecl *getXTUDefinition(const FunctionDecl *FD,
-                                       CompilerInstance &CI);
+  const FunctionDecl *
+  getXTUDefinition(const FunctionDecl *FD, CompilerInstance &CI,
+                   StringRef XTUDir, DiagnosticsEngine &Diags,
+                   std::function<ASTUnit *(StringRef)> Loader);
 
   //===--------------------------------------------------------------------===//
   //                         Type Sizing and Analysis
