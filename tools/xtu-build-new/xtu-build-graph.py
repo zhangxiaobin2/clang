@@ -130,7 +130,7 @@ def kruskal_like_remove(graph):
             continue;
         fixEdges.add(edge)
         alreadyInlined.add(edge.fn)
-        print str(edge.fn) + " " + str(edge.val)
+        #print str(edge.fn) + " " + str(edge.val)
         updatePathTable(edge)
 
     for edge in needRecheck:
