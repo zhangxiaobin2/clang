@@ -3150,7 +3150,6 @@ Decl *ASTNodeImporter::VisitEnumConstantDecl(EnumConstantDecl *D) {
   DeclarationName Name;
   SourceLocation Loc;
   NamedDecl *ToD;
-  const FunctionDecl *FoundWithoutBody = nullptr;
 
   if (ImportDeclParts(D, DC, LexicalDC, Name, ToD, Loc))
     return nullptr;
@@ -3215,6 +3214,8 @@ Decl *ASTNodeImporter::VisitFunctionDecl(FunctionDecl *D) {
     return nullptr;
   if (ToD)
     return ToD;
+
+  const FunctionDecl *FoundWithoutBody = nullptr;
 
   // Try to find a function in our own ("to") context with the same name, same
   // type, and in the same context as the function we're importing.
