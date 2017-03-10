@@ -1,9 +1,10 @@
 #!/usr/bin/env python
-#This script is called by analyze-cc to perform memory profiling using valgrind massif.
-#It is called instead of the original clang executable.
-#If -### parameter is passed to it (printing clangs compilation commands) it does
-#not invoke valgrind, only returns clangs output and changes to clang executable name in the output to this script,
-#otherwise it calls clang with memory profiling.
+# This script is called by analyze-cc to perform memory profiling using
+# valgrind massif. It is called instead of the original clang executable.
+# If -### parameter is passed to it (printing clangs compilation commands)
+# it does not invoke valgrind, only returns clangs output and changes to clang
+# executable name in the output to this script, otherwise it calls clang with
+# memory profiling.
 
 import os
 import subprocess
@@ -55,7 +56,7 @@ for param in sys.argv[1:]:
     if (param == "-###"):
         use_valgrind = False
 
-if (use_valgrind == False):
+if (use_valgrind is False):
     clang_command = [os.environ["ANALYZE_BUILD_CLANG_ORIG"]]
     clang_command.extend(sys.argv[1:])
     output = run_command(clang_command)
@@ -63,10 +64,11 @@ if (use_valgrind == False):
     print ret
     sys.exit(0)
 else:
-    clang_command = [os.environ["VALGRIND_PATH"], "-q", "--time-unit=B", "--tool=massif",
-                     "--massif-out-file=" +
+    clang_command = [os.environ["VALGRIND_PATH"], "-q", "--time-unit=B",
+                     "--tool=massif", "--massif-out-file=" +
                      os.path.join(
-                         os.environ["MEMPROF_PATH"], os.environ["MEMPROF_OUTFILE"] + ".%p.massif"),
+                         os.environ["MEMPROF_PATH"],
+                         os.environ["MEMPROF_OUTFILE"] + ".%p.massif"),
                      os.environ["ANALYZE_BUILD_CLANG_ORIG"]]
     clang_command.extend(sys.argv[1:])
     output = run_command(clang_command)
