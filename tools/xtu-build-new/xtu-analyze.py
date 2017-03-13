@@ -92,7 +92,8 @@ parser.add_argument('--record-coverage', dest='record_coverage',
                     help='Generate coverage information during analysis')
 parser.add_argument('--record-memory-profile', dest='record_memprof',
                     action='store_true',
-                    help='Generate Valgrind Massif memory profile information during analysis (into xtuoutdir/memprof)')
+                    help='Generate Valgrind Massif memory profile information '
+                         'during analysis (into xtuoutdir/memprof)')
 parser.add_argument('--log-passed-build', metavar='passed-buildlog.json',
                     dest='passed_buildlog',
                     help='Write new buildlog JSON of files passing analysis')
@@ -145,7 +146,8 @@ def check_executable_available(exe_name, arg_path):
 
 clang_path = check_executable_available('clang', mainargs.clang_path)
 analyze_path = check_executable_available('analyze-cc', mainargs.analyze_path)
-valgrind_path = check_executable_available('valgrind', "/usr/bin")
+if mainargs.record_memprof:
+    valgrind_path = check_executable_available('valgrind', "/usr/bin")
 
 analyzer_params = []
 if mainargs.enabled_checkers:
@@ -164,13 +166,13 @@ if mainargs.record_coverage:
                                                   gcov_outdir))
     shutil.rmtree(gcov_tmppath, True)
 if mainargs.record_memprof:
-    #memprof_analyze.sh calls clang with valgrind profiling.
-    #We need to wrap it in a script so scan-build/analyze-cc
-    #can call it instead of clang.
+    # memprof_analyze.sh calls clang with valgrind profiling.
+    # We need to wrap it in a script so scan-build/analyze-cc
+    # can call it instead of clang.
     memprof_path = os.path.abspath(os.path.join(mainargs.xtuoutdir,
                                                 "memprof"))
     memprof_command = os.path.join(os.path.dirname(__file__),
-                             'lib', 'memprof_analyze.py')
+                                   'lib', 'memprof_analyze.py')
 
 analyzer_params += ['-analyzer-stats']
 passthru_analyzer_params = []
@@ -267,7 +269,8 @@ def analyze(directory, command):
         ' ' + string.join(args, ' ')
     if mainargs.record_memprof:
         cmdenv['MEMPROF_PATH'] = memprof_path
-        cmdenv['ANALYZE_BUILD_CLANG_ORIG'] = analyzer_env['ANALYZE_BUILD_CLANG']
+        cmdenv['ANALYZE_BUILD_CLANG_ORIG'] = \
+            analyzer_env['ANALYZE_BUILD_CLANG']
         cmdenv['ANALYZE_BUILD_CLANG'] = memprof_command
         cmdenv['VALGRIND_PATH'] = os.path.join(valgrind_path, "valgrind")
         cmdenv['MEMPROF_OUTFILE'] = tu_name
@@ -384,8 +387,9 @@ def analyze_work():
 
 try:
     os.makedirs(os.path.abspath(mainargs.xtuoutdir))
-    if not os.path.exists(memprof_path):
-        os.makedirs(memprof_path)
+    if mainargs.record_memprof:
+        if not os.path.exists(memprof_path):
+            os.makedirs(memprof_path)
 except OSError:
     print 'Output directory %s already exists!' % \
         os.path.abspath(mainargs.xtuoutdir)
