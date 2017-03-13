@@ -53,10 +53,10 @@ this_script = __file__
 use_valgrind = True
 
 for param in sys.argv[1:]:
-    if (param == "-###"):
+    if param == "-###":
         use_valgrind = False
 
-if (use_valgrind is False):
+if use_valgrind is False:
     clang_command = [os.environ["ANALYZE_BUILD_CLANG_ORIG"]]
     clang_command.extend(sys.argv[1:])
     output = run_command(clang_command)
