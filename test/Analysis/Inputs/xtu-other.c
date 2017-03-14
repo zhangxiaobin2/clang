@@ -31,3 +31,11 @@ int g(struct S *ctx){
   MYMACRO(ctx);
   return 0; 
 }
+
+// TEST asm import not failing
+int getkey() {
+  int res;
+  asm ( "mov $42, %0"
+      : "=r" (res));
+  return res;
+}

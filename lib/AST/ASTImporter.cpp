@@ -5256,14 +5256,14 @@ Stmt *ASTNodeImporter::VisitGCCAsmStmt(GCCAsmStmt *S) {
   SmallVector<IdentifierInfo *, 4> Names;
   for (unsigned I = 0, E = S->getNumOutputs(); I != E; I++) {
     IdentifierInfo *ToII = Importer.Import(S->getOutputIdentifier(I));
-    if (!ToII)
-      return nullptr;
+    // It is normal that assert(ToII) fails,
+    // see ParseStmtAsm::ParseAsmOperandsOpt putting nullptr in Names
     Names.push_back(ToII);
   }
   for (unsigned I = 0, E = S->getNumInputs(); I != E; I++) {
     IdentifierInfo *ToII = Importer.Import(S->getInputIdentifier(I));
-    if (!ToII)
-      return nullptr;
+    // It is normal that assert(ToII) fails,
+    // see ParseStmtAsm::ParseAsmOperandsOpt putting nullptr in Names
     Names.push_back(ToII);
   }
 
