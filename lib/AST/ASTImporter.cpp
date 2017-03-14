@@ -136,7 +136,8 @@ namespace clang {
                            bool Complain = true);
     bool IsStructuralMatch(VarDecl *FromVar, VarDecl *ToVar,
                            bool Complain = true);
-    bool IsStructuralMatch(EnumDecl *FromEnum, EnumDecl *ToRecord);
+    bool IsStructuralMatch(EnumDecl *FromEnum, EnumDecl *ToRecord,
+                           bool Complain = true);
     bool IsStructuralMatch(EnumConstantDecl *FromEC, EnumConstantDecl *ToEC);
     bool IsStructuralMatch(ClassTemplateDecl *From, ClassTemplateDecl *To);
     bool IsStructuralMatch(VarTemplateDecl *From, VarTemplateDecl *To);
@@ -1221,6 +1222,10 @@ static Optional<unsigned> findUntaggedStructOrUnionIndex(RecordDecl *Anon) {
     // If the field looks like this:
     // struct { ... } A;
     QualType FieldType = F->getType();
+    // In case of nested structs.
+    while (const auto *ElabType = dyn_cast<ElaboratedType>(FieldType)) {
+      FieldType = ElabType->getNamedType();
+    }
     if (const auto *RecType = dyn_cast<RecordType>(FieldType)) {
       const RecordDecl *RecDecl = RecType->getDecl();
       if (RecDecl->getDeclContext() == Owner &&
@@ -2611,10 +2616,12 @@ bool ASTNodeImporter::IsStructuralMatch(VarDecl *FromVar, VarDecl *ToVar,
   return Ctx.IsStructurallyEquivalent(FromVar, ToVar);
 }
 
-bool ASTNodeImporter::IsStructuralMatch(EnumDecl *FromEnum, EnumDecl *ToEnum) {
+bool ASTNodeImporter::IsStructuralMatch(EnumDecl *FromEnum, EnumDecl *ToEnum,
+                                        bool Complain) {
   StructuralEquivalenceContext Ctx(Importer.getFromContext(),
                                    Importer.getToContext(),
-                                   Importer.getNonEquivalentDecls());
+                                   Importer.getNonEquivalentDecls(),
+                                   false, Complain);
   return Ctx.IsStructurallyEquivalent(FromEnum, ToEnum);
 }
 
@@ -2623,6 +2630,11 @@ bool ASTNodeImporter::IsStructuralMatch(EnumConstantDecl *FromEC,
 {
   const llvm::APSInt &FromVal = FromEC->getInitVal();
   const llvm::APSInt &ToVal = ToEC->getInitVal();
+
+  EnumDecl* ToDC = cast<EnumDecl>(ToEC->getDeclContext());
+  EnumDecl* FromDC = cast<EnumDecl>(FromEC->getDeclContext());
+  if(!IsStructuralMatch(FromDC,ToDC,false))
+    return false;
 
   return FromVal.isSigned() == ToVal.isSigned() &&
          FromVal.getBitWidth() == ToVal.getBitWidth() &&
@@ -2929,7 +2941,7 @@ Decl *ASTNodeImporter::VisitEnumDecl(EnumDecl *D) {
   if (!DC->isFunctionOrMethod() && SearchName) {
     SmallVector<NamedDecl *, 4> ConflictingDecls;
     SmallVector<NamedDecl *, 2> FoundDecls;
-    DC->getRedeclContext()->localUncachedLookup(Name, FoundDecls);
+    DC->getRedeclContext()->localUncachedLookup(SearchName, FoundDecls);
     for (unsigned I = 0, N = FoundDecls.size(); I != N; ++I) {
       if (!FoundDecls[I]->isInIdentifierNamespace(IDNS))
         continue;
@@ -3015,10 +3027,11 @@ Decl *ASTNodeImporter::VisitRecordDecl(RecordDecl *D) {
 
   // We may already have a record of the same name; try to find and match it.
   RecordDecl *AdoptDecl = nullptr;
+  RecordDecl *PrevDecl = nullptr;
   if (!DC->isFunctionOrMethod()) {
     SmallVector<NamedDecl *, 4> ConflictingDecls;
     SmallVector<NamedDecl *, 2> FoundDecls;
-    DC->getRedeclContext()->localUncachedLookup(Name, FoundDecls);
+    DC->getRedeclContext()->localUncachedLookup(SearchName, FoundDecls);
     for (unsigned I = 0, N = FoundDecls.size(); I != N; ++I) {
       if (!FoundDecls[I]->isInIdentifierNamespace(IDNS))
         continue;
@@ -3030,9 +3043,8 @@ Decl *ASTNodeImporter::VisitRecordDecl(RecordDecl *D) {
       }
       
       if (RecordDecl *FoundRecord = dyn_cast<RecordDecl>(Found)) {
-        if (D->isAnonymousStructOrUnion() && 
-            FoundRecord->isAnonymousStructOrUnion()) {
-          // If both anonymous structs/unions are in a record context, make sure
+        if (!SearchName) {
+          // If both unnamed structs/unions are in a record context, make sure
           // they occur in the same location in the context records.
           if (Optional<unsigned> Index1
               = findUntaggedStructOrUnionIndex(D)) {
@@ -3076,8 +3088,8 @@ Decl *ASTNodeImporter::VisitRecordDecl(RecordDecl *D) {
               
           AdoptDecl = FoundRecord;
           continue;
-        } else if (!SearchName) {
-          continue;
+        } else {
+          PrevDecl = FoundRecord->getMostRecentDecl();
         }
       }
       
@@ -3128,7 +3140,7 @@ Decl *ASTNodeImporter::VisitRecordDecl(RecordDecl *D) {
       D2->setAccess(D->getAccess());
     } else {
       D2 = RecordDecl::Create(Importer.getToContext(), D->getTagKind(),
-                              DC, StartLoc, Loc, Name.getAsIdentifierInfo());
+                              DC, StartLoc, Loc, Name.getAsIdentifierInfo(), PrevDecl);
     }
     
     D2->setQualifierInfo(Importer.Import(D->getQualifierLoc()));
