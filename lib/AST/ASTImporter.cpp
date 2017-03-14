@@ -6089,16 +6089,16 @@ Expr *ASTNodeImporter::VisitTypeTraitExpr(TypeTraitExpr *E) {
 
   unsigned NumArgs = E->getNumArgs();
   llvm::SmallVector<TypeSourceInfo *, 2> ToArgTypes(NumArgs);
-  for (unsigned AI = 0, AE = NumArgs; AI != AE; ++AI) {
+  for (unsigned AI = 0; AI != NumArgs; ++AI) {
     TypeSourceInfo *FromArgType = E->getArg(AI);
     TypeSourceInfo *ToArgType = Importer.Import(FromArgType);
-    if (!ToArgType)
+    if (!ToArgType && FromArgType)
       return nullptr;
     ToArgTypes[AI] = ToArgType;
   }
   TypeSourceInfo **ToArgTypesArray = new (Importer.getToContext())
       TypeSourceInfo*[NumArgs];
-  for (unsigned AI = 0, AE = NumArgs; AI != AE; ++AI)
+  for (unsigned AI = 0; AI != NumArgs; ++AI)
     ToArgTypesArray[AI] = ToArgTypes[AI];
 
   return TypeTraitExpr::Create(Importer.getToContext(), T,
