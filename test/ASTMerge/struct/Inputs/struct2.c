@@ -58,3 +58,65 @@ struct {
   int i;
   float f;
 } x11;
+
+//Matches
+struct Unnamed {
+  union {
+    struct {
+      int i;
+    } S;
+    struct {
+      float i;
+    } R;
+  } U;
+} x12;
+
+//Matches
+struct DeepUnnamed {
+  union {
+    union {
+      struct {
+        long i;
+      } S;
+      struct {
+        int i;
+      } R;
+    } U1;
+    union {
+      struct {
+        long i;
+      } S;
+      struct {
+        float i;
+      } T;
+    } U2;
+  } U;
+  struct {
+    long i;
+  } V;
+} x13;
+
+// Mismatch due to unnamed struct used internally
+struct DeepUnnamedError {
+  union {
+    union {
+      struct {
+        long i;
+      } S;
+      struct {
+        int i;
+      } R;
+    } U1;
+    union {
+      struct {
+        float i;
+      } S;
+      struct {
+        float i;
+      } T;
+    } U2;
+  } U;
+  struct {
+    long i;
+  } V;
+} x14;
