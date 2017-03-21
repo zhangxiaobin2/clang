@@ -123,3 +123,9 @@ struct DeepUnnamedError {
     long i;
   } V;
 } x14;
+
+// Global unnamed struct.
+struct {
+  int i;
+  int h[15];
+} x15;
