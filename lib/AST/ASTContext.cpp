@@ -1486,20 +1486,29 @@ const FunctionDecl *ASTContext::getCTUDefinition(
       llvm::sys::path::append(ExternalFunctionMap, "externalFnMap.txt");
       std::ifstream ExternalFnMapFile(ExternalFunctionMap.c_str());
       if (!ExternalFnMapFile) {
-        llvm::errs() << "error: '" << ExternalFunctionMap
-                     << "' cannot be opened: falling back to non-CTU mode\n";
+        unsigned DiagID = getDiagnostics().getCustomDiagID(
+            DiagnosticsEngine::Error, "%0 not found");
+        getDiagnostics().Report(DiagID) << ExternalFunctionMap.c_str();
         return nullptr;
       }
 
       std::string FunctionName, FileName;
       std::string line;
+      unsigned l=0;
       while (std::getline(ExternalFnMapFile, line)) {
         size_t pos = line.find(" ");
-        FunctionName = line.substr(0, pos);
-        FileName = line.substr(pos + 1);
-        SmallString<256> FilePath = CTUDir;
-        llvm::sys::path::append(FilePath, FileName);
-        FunctionFileMap[FunctionName] = FilePath.str().str();
+        if (pos > 0 && pos < std::string::npos) {
+          FunctionName = line.substr(0, pos);
+          FileName = line.substr(pos + 1);
+          SmallString<256> FilePath = CTUDir;
+          llvm::sys::path::append(FilePath, FileName);
+          FunctionFileMap[FunctionName] = FilePath.str().str();
+        } else {
+          unsigned DiagID = getDiagnostics().getCustomDiagID(
+              DiagnosticsEngine::Error, "%0 parsing error in line %1");
+          getDiagnostics().Report(DiagID) << ExternalFunctionMap.c_str()<<l;
+        }
+        l++;
       }
     }
 
