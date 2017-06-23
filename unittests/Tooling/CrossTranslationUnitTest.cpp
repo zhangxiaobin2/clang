@@ -22,6 +22,7 @@ namespace tooling {
 namespace {
 StringRef IndexFileName = "index.txt";
 StringRef ASTFileName = "f.ast";
+StringRef DefinitionFileName = "input.cc";
 
 class CTUASTConsumer : public clang::ASTConsumer {
 public:
@@ -46,7 +47,7 @@ public:
     OS.flush();
     StringRef SourceText = "int f(int) { return 0; }\n";
     // This file must exist since the saved ASTFile will reference it.
-    llvm::raw_fd_ostream OS2("input.cc", EC, llvm::sys::fs::F_Text);
+    llvm::raw_fd_ostream OS2(DefinitionFileName, EC, llvm::sys::fs::F_Text);
     OS2 << SourceText;
     OS2.flush();
     std::unique_ptr<ASTUnit> ASTWithDefinition =
@@ -89,6 +90,8 @@ TEST(CrossTranslationUnit, CanLoadFunctionDefinition) {
   EXPECT_FALSE((bool)llvm::sys::fs::remove(IndexFileName));
   EXPECT_TRUE(llvm::sys::fs::exists(ASTFileName));
   EXPECT_FALSE((bool)llvm::sys::fs::remove(ASTFileName));
+  EXPECT_TRUE(llvm::sys::fs::exists(DefinitionFileName));
+  EXPECT_FALSE((bool)llvm::sys::fs::remove(DefinitionFileName));
 }
 
 } // end namespace tooling

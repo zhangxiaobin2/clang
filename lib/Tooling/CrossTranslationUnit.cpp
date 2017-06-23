@@ -56,7 +56,6 @@ CrossTranslationUnit::findFunctionInDeclContext(const DeclContext *DC,
     const FunctionDecl *ResultDecl;
     if (!ND || !ND->hasBody(ResultDecl))
       continue;
-    // We are already sure that the triple is correct here.
     if (getLookupName(ResultDecl) != LookupFnName)
       continue;
     return ResultDecl;
