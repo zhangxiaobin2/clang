@@ -37,13 +37,7 @@ std::string CrossTranslationUnit::getLookupName(const NamedDecl *ND) {
   SmallString<128> DeclUSR;
   bool Ret = index::generateUSRForDecl(ND, DeclUSR);
   assert(!Ret);
-  llvm::raw_svector_ostream OS(DeclUSR);
-  // To support cross compilation.
-  llvm::Triple::ArchType T = Context.getTargetInfo().getTriple().getArch();
-  if (T == llvm::Triple::thumb)
-    T = llvm::Triple::arm;
-  OS << "@" << Context.getTargetInfo().getTriple().getArchTypeName(T);
-  return OS.str();
+  return DeclUSR.str();
 }
 
 /// Recursively visit the funtion decls of a DeclContext, and looks up a
@@ -70,9 +64,8 @@ CrossTranslationUnit::findFunctionInDeclContext(const DeclContext *DC,
   return nullptr;
 }
 
-const FunctionDecl *
-CrossTranslationUnit::getCTUDefinition(const FunctionDecl *FD, StringRef CTUDir,
-                                       StringRef IndexName) {
+const FunctionDecl *CrossTranslationUnit::getCrossTUDefinition(
+    const FunctionDecl *FD, StringRef CrossTUDir, StringRef IndexName) {
   assert(!FD->hasBody() && "FD has a definition in current translation unit!");
 
   std::string LookupFnName = getLookupName(FD);
@@ -82,7 +75,7 @@ CrossTranslationUnit::getCTUDefinition(const FunctionDecl *FD, StringRef CTUDir,
   auto FnUnitCacheEntry = FunctionAstUnitMap.find(LookupFnName);
   if (FnUnitCacheEntry == FunctionAstUnitMap.end()) {
     if (FunctionFileMap.empty()) {
-      SmallString<256> ExternalFunctionMap = CTUDir;
+      SmallString<256> ExternalFunctionMap = CrossTUDir;
       llvm::sys::path::append(ExternalFunctionMap, IndexName);
       std::ifstream ExternalFnMapFile(ExternalFunctionMap.c_str());
       if (!ExternalFnMapFile) {
@@ -97,7 +90,7 @@ CrossTranslationUnit::getCTUDefinition(const FunctionDecl *FD, StringRef CTUDir,
         size_t pos = line.find(" ");
         FunctionName = line.substr(0, pos);
         FileName = line.substr(pos + 1);
-        SmallString<256> FilePath = CTUDir;
+        SmallString<256> FilePath = CrossTUDir;
         llvm::sys::path::append(FilePath, FileName);
         FunctionFileMap[FunctionName] = FilePath.str().str();
       }
