@@ -18,6 +18,7 @@
 #include "clang/Basic/TargetInfo.h"
 #include "clang/Frontend/ASTUnit.h"
 #include "clang/Frontend/CompilerInstance.h"
+#include "clang/Frontend/FrontendDiagnostic.h"
 #include "clang/Frontend/TextDiagnosticPrinter.h"
 #include "clang/Index/USRGeneration.h"
 #include "llvm/ADT/Triple.h"
@@ -78,20 +79,28 @@ const FunctionDecl *CrossTranslationUnit::getCrossTUDefinition(
       llvm::sys::path::append(ExternalFunctionMap, IndexName);
       std::ifstream ExternalFnMapFile(ExternalFunctionMap.c_str());
       if (!ExternalFnMapFile) {
-        llvm::errs() << "error: '" << ExternalFunctionMap
-                     << "' cannot be opened: falling back to non-CTU mode\n";
+        Context.getDiagnostics().Report(diag::err_fe_error_opening)
+            << ExternalFunctionMap << "required by the CrossTU functionality";
         return nullptr;
       }
 
-      std::string FunctionName, FileName;
-      std::string line;
-      while (std::getline(ExternalFnMapFile, line)) {
-        size_t pos = line.find(" ");
-        FunctionName = line.substr(0, pos);
-        FileName = line.substr(pos + 1);
-        SmallString<256> FilePath = CrossTUDir;
-        llvm::sys::path::append(FilePath, FileName);
-        FunctionFileMap[FunctionName] = FilePath.str().str();
+      StringRef FunctionName, FileName;
+      std::string Line;
+      unsigned LineNo = 0;
+      while (std::getline(ExternalFnMapFile, Line)) {
+        size_t Pos = Line.find(" ");
+        StringRef LineRef{Line};
+        if (Pos > 0 && Pos != std::string::npos) {
+          FunctionName = LineRef.substr(0, Pos);
+          FileName = LineRef.substr(Pos + 1);
+          SmallString<256> FilePath = CrossTUDir;
+          llvm::sys::path::append(FilePath, FileName);
+          FunctionFileMap[FunctionName] = FilePath.str().str();
+        } else {
+          Context.getDiagnostics().Report(diag::err_fnmap_parsing)
+              << ExternalFunctionMap << (LineNo + 1);
+        }
+        LineNo++;
       }
     }
 
@@ -110,8 +119,8 @@ const FunctionDecl *CrossTranslationUnit::getCrossTUDefinition(
           new DiagnosticsEngine(DiagID, &*DiagOpts, DiagClient));
 
       std::unique_ptr<ASTUnit> LoadedUnit(ASTUnit::LoadFromASTFile(
-          ASTFileName, CI.getPCHContainerOperations()->getRawReader(), Diags,
-          CI.getFileSystemOpts()));
+          ASTFileName, CI.getPCHContainerOperations()->getRawReader(),
+          ASTUnit::LoadEverything, Diags, CI.getFileSystemOpts()));
       Unit = LoadedUnit.get();
       FileASTUnitMap[ASTFileName] = std::move(LoadedUnit);
     } else {
