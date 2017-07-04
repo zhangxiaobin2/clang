@@ -23,10 +23,23 @@
 #include "clang/Index/USRGeneration.h"
 #include "clang/Tooling/JSONCompilationDatabase.h"
 #include "clang/Tooling/Tooling.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 #include <fstream>
+
+namespace {
+#define DEBUG_TYPE "CrossTranslationUnit"
+STATISTIC(NumGetCTUCalled, "The # of getCTUDefinition function called");
+STATISTIC(NumNoUnit, "The # of getCTUDefinition NoUnit");
+STATISTIC(
+    NumNotInOtherTU,
+    "The # of getCTUDefinition called but the function is not in other TU");
+STATISTIC(NumIterateNotFound, "The # of iteration not found");
+STATISTIC(NumGetCTUSuccess, "The # of getCTUDefinition successfully return the "
+                            "requested function's body");
+}
 
 namespace clang {
 namespace tooling {
@@ -70,6 +83,7 @@ const FunctionDecl *CrossTranslationUnit::getCrossTUDefinition(
     const FunctionDecl *FD, StringRef CrossTUDir, StringRef IndexName,
     StringRef CompilationDatabase) {
   assert(!FD->hasBody() && "FD has a definition in current translation unit!");
+  ++NumGetCTUCalled;
 
   std::string LookupFnName = getLookupName(FD);
   if (LookupFnName.empty())
@@ -109,8 +123,10 @@ const FunctionDecl *CrossTranslationUnit::getCrossTUDefinition(
 
     StringRef ASTFileName;
     auto It = FunctionFileMap.find(LookupFnName);
-    if (It == FunctionFileMap.end())
+    if (It == FunctionFileMap.end()) {
+      ++NumNotInOtherTU;
       return nullptr; // No definition found even in some other build unit.
+    }
     ASTFileName = It->second;
     auto ASTCacheEntry = FileASTUnitMap.find(ASTFileName);
     if (ASTCacheEntry == FileASTUnitMap.end()) {
@@ -153,8 +169,10 @@ const FunctionDecl *CrossTranslationUnit::getCrossTUDefinition(
     Unit = FnUnitCacheEntry->second;
   }
 
-  if (!Unit)
+  if (!Unit) {
+    ++NumNoUnit;
     return nullptr;
+  }
   assert(&Unit->getFileManager() ==
          &Unit->getASTContext().getSourceManager().getFileManager());
   ASTImporter &Importer = getOrCreateASTImporter(Unit->getASTContext());
@@ -165,8 +183,10 @@ const FunctionDecl *CrossTranslationUnit::getCrossTUDefinition(
         Importer.Import(const_cast<FunctionDecl *>(ResultDecl)));
     assert(ToDecl->hasBody());
     assert(FD->hasBody() && "Functions already imported should have body.");
+    ++NumGetCTUSuccess;
     return ToDecl;
   }
+  ++NumIterateNotFound;
   return nullptr;
 }
 

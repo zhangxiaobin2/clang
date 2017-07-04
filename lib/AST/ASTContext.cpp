@@ -38,7 +38,6 @@
 #include "clang/Frontend/ASTUnit.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/StaticAnalyzer/Core/AnalyzerOptions.h"
-#include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Support/Capacity.h"
@@ -48,14 +47,6 @@
 #include <map>
 
 using namespace clang;
-#define DEBUG_TYPE "ASTContext"
-
-STATISTIC(NumGetXTUCalled, "The # of getXTUDefinition function called");
-STATISTIC(NumNoUnit, "The # of getXTUDefinition NoUnit");
-STATISTIC(NumNotInOtherTU, "The # of getXTUDefinition called but the function is not in other TU");
-STATISTIC(NumNotEvenMangle, "The # of getXTUDefinition cant even mangle");
-STATISTIC(NumIterateNotFound, "The # of iteration not found");
-STATISTIC(NumGetXTUSuccess, "The # of getXTUDefinition successfully return the requested function's body");
 
 unsigned ASTContext::NumImplicitDefaultConstructors;
 unsigned ASTContext::NumImplicitDefaultConstructorsDeclared;
