@@ -8,8 +8,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "clang/AST/ASTConsumer.h"
+#include "clang/CrossTU/CrossTranslationUnit.h"
 #include "clang/Frontend/FrontendAction.h"
-#include "clang/Tooling/CrossTranslationUnit.h"
 #include "clang/Tooling/Tooling.h"
 #include "llvm/Config/llvm-config.h"
 #include "llvm/Support/Path.h"
@@ -17,7 +17,7 @@
 #include <cassert>
 
 namespace clang {
-namespace tooling {
+namespace crossTU {
 
 namespace {
 StringRef IndexFileName = "index.txt";
@@ -51,7 +51,7 @@ public:
     OS2 << SourceText;
     OS2.flush();
     std::unique_ptr<ASTUnit> ASTWithDefinition =
-        buildASTFromCode(SourceText);
+        tooling::buildASTFromCode(SourceText);
     ASTWithDefinition->Save(ASTFileName);
 
     // Load the definition from the AST file.
@@ -84,7 +84,7 @@ private:
 
 TEST(CrossTranslationUnit, CanLoadFunctionDefinition) {
   bool Success = false;
-  EXPECT_TRUE(runToolOnCode(new CTUAction(&Success), "int f(int);"));
+  EXPECT_TRUE(tooling::runToolOnCode(new CTUAction(&Success), "int f(int);"));
   EXPECT_TRUE(Success);
   EXPECT_TRUE(llvm::sys::fs::exists(IndexFileName));
   EXPECT_FALSE((bool)llvm::sys::fs::remove(IndexFileName));

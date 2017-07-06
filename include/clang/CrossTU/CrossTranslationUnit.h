@@ -27,7 +27,7 @@ class FunctionDecl;
 class NamedDecl;
 class TranslationUnitDecl;
 
-namespace tooling {
+namespace crossTU {
 
 /// \brief This class can be used for tools that requires cross translation
 ///        unit capability.

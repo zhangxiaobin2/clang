@@ -12,7 +12,7 @@
 //  support.
 //
 //===----------------------------------------------------------------------===//
-#include "clang/Tooling/CrossTranslationUnit.h"
+#include "clang/CrossTU/CrossTranslationUnit.h"
 #include "clang/AST/ASTImporter.h"
 #include "clang/AST/Decl.h"
 #include "clang/Basic/TargetInfo.h"
@@ -27,7 +27,7 @@
 #include <fstream>
 
 namespace clang {
-namespace tooling {
+namespace crossTU {
 
 CrossTranslationUnit::CrossTranslationUnit(CompilerInstance &CI)
     : CI(CI), Context(CI.getASTContext()) {}
