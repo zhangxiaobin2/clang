@@ -7,7 +7,7 @@ add_clang_unittest(CrossTUTests
   CrossTranslationUnitTest.cpp
   )
 
-target_link_libraries(ToolingTests
+target_link_libraries(CrossTUTests
   clangAST
   clangBasic
   clangCrossTU
