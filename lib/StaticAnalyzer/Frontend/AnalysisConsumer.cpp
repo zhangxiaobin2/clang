@@ -524,7 +524,7 @@ void AnalysisConsumer::HandleDeclsCallGraph(const unsigned LocalTUDeclsSize) {
   llvm::StringSet<> VisitedAsCTU;
   std::string VisitedFuncSetFile;
   StringRef BuildDir = Opts->getCTUDir();
-  if (!BuildDir.empty() && !Opts->shouldReanalyzeXTUVisitedFns()) {
+  if (!BuildDir.empty() && !Opts->shouldReanalyzeCTUVisitedFns()) {
     clock_t t1 = clock();
     VisitedFuncSetFile = (BuildDir + "/visitedFunc.txt").str();
     std::ifstream VisitedFuncSetStream(VisitedFuncSetFile);
@@ -575,7 +575,7 @@ void AnalysisConsumer::HandleDeclsCallGraph(const unsigned LocalTUDeclsSize) {
     VisitedAsTopLevel.insert(D);
   }
 
-  if (!BuildDir.empty() && !Opts->shouldReanalyzeXTUVisitedFns()) {
+  if (!BuildDir.empty() && !Opts->shouldReanalyzeCTUVisitedFns()) {
     clock_t t1 = clock();
     llvm::StringSet<> NewVisited;
 
