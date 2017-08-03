@@ -7,7 +7,9 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  This file implements the CrossTranslationUnit interface.
+//  This file provides an interface to load binary AST dumps on demand. This
+//  feature can be utilized for tools that require cross translation unit
+//  support.
 //
 //===----------------------------------------------------------------------===//
 #ifndef LLVM_CLANG_CROSSTU_CROSSTRANSLATIONUNIT_H
