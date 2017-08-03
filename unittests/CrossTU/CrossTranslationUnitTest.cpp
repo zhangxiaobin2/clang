@@ -17,7 +17,7 @@
 #include <cassert>
 
 namespace clang {
-namespace crossTU {
+namespace cross_tu {
 
 namespace {
 StringRef IndexFileName = "index.txt";
@@ -94,5 +94,5 @@ TEST(CrossTranslationUnit, CanLoadFunctionDefinition) {
   EXPECT_FALSE((bool)llvm::sys::fs::remove(DefinitionFileName));
 }
 
-} // end namespace tooling
+} // end namespace cross_tu
 } // end namespace clang

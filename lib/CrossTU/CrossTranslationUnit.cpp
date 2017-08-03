@@ -16,6 +16,7 @@
 #include "clang/AST/ASTImporter.h"
 #include "clang/AST/Decl.h"
 #include "clang/Basic/TargetInfo.h"
+#include "clang/CrossTU/CrossTUDiagnostics.h"
 #include "clang/Frontend/ASTUnit.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Frontend/FrontendDiagnostic.h"
@@ -27,7 +28,7 @@
 #include <fstream>
 
 namespace clang {
-namespace crossTU {
+namespace cross_tu {
 
 CrossTranslationUnit::CrossTranslationUnit(CompilerInstance &CI)
     : CI(CI), Context(CI.getASTContext()) {}
@@ -159,5 +160,5 @@ ASTImporter &CrossTranslationUnit::getOrCreateASTImporter(ASTContext &From) {
   return *NewImporter;
 }
 
-} // namespace tooling
+} // namespace cross_tu
 } // namespace clang

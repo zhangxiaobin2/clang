@@ -10,8 +10,8 @@
 //  This file implements the CrossTranslationUnit interface.
 //
 //===----------------------------------------------------------------------===//
-#ifndef LLVM_CLANG_TOOLING_CROSSTRANSLATIONUNIT_H
-#define LLVM_CLANG_TOOLING_CROSSTRANSLATIONUNIT_H
+#ifndef LLVM_CLANG_CROSSTU_CROSSTRANSLATIONUNIT_H
+#define LLVM_CLANG_CROSSTU_CROSSTRANSLATIONUNIT_H
 
 #include "clang/Basic/LLVM.h"
 #include "llvm/ADT/DenseMap.h"
@@ -27,7 +27,7 @@ class FunctionDecl;
 class NamedDecl;
 class TranslationUnitDecl;
 
-namespace crossTU {
+namespace cross_tu {
 
 /// \brief This class can be used for tools that requires cross translation
 ///        unit capability.
@@ -75,7 +75,7 @@ private:
   ASTContext &Context;
 };
 
-} // namespace tooling
+} // namespace cross_tu
 } // namespace clang
 
-#endif // LLVM_CLANG_TOOLING_CROSSTRANSLATIONUNIT_H
+#endif // LLVM_CLANG_CROSSTU_CROSSTRANSLATIONUNIT_H
