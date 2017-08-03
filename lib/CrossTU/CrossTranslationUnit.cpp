@@ -73,8 +73,8 @@ const FunctionDecl *CrossTranslationUnit::getCrossTUDefinition(
   if (LookupFnName.empty())
     return nullptr;
   ASTUnit *Unit = nullptr;
-  auto FnUnitCacheEntry = FunctionAstUnitMap.find(LookupFnName);
-  if (FnUnitCacheEntry == FunctionAstUnitMap.end()) {
+  auto FnUnitCacheEntry = FunctionASTUnitMap.find(LookupFnName);
+  if (FnUnitCacheEntry == FunctionASTUnitMap.end()) {
     if (FunctionFileMap.empty()) {
       SmallString<256> ExternalFunctionMap = CrossTUDir;
       llvm::sys::path::append(ExternalFunctionMap, IndexName);
@@ -127,7 +127,7 @@ const FunctionDecl *CrossTranslationUnit::getCrossTUDefinition(
     } else {
       Unit = ASTCacheEntry->second.get();
     }
-    FunctionAstUnitMap[LookupFnName] = Unit;
+    FunctionASTUnitMap[LookupFnName] = Unit;
   } else {
     Unit = FnUnitCacheEntry->second;
   }

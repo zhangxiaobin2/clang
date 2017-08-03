@@ -67,7 +67,7 @@ private:
                                                 StringRef LookupFnName);
 
   llvm::StringMap<std::unique_ptr<clang::ASTUnit>> FileASTUnitMap;
-  llvm::StringMap<clang::ASTUnit *> FunctionAstUnitMap;
+  llvm::StringMap<clang::ASTUnit *> FunctionASTUnitMap;
   llvm::StringMap<std::string> FunctionFileMap;
   llvm::DenseMap<TranslationUnitDecl *, std::unique_ptr<ASTImporter>>
       ASTUnitImporterMap;
