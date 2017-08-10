@@ -32,4 +32,4 @@ void foo() {
 // CHECK-NEXT: unroll-loops = false
 // CHECK-NEXT: widen-loops = false
 // CHECK-NEXT: [stats]
-// CHECK-NEXT: num-entries = 18
+// CHECK-NEXT: num-entries = 19
