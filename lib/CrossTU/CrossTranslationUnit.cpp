@@ -28,10 +28,10 @@
 namespace clang {
 namespace cross_tu {
 
-CrossTranslationUnit::CrossTranslationUnit(CompilerInstance &CI)
+CrossTranslationUnitContext::CrossTranslationUnitContext(CompilerInstance &CI)
     : CI(CI), Context(CI.getASTContext()) {}
 
-CrossTranslationUnit::~CrossTranslationUnit() {}
+CrossTranslationUnitContext::~CrossTranslationUnitContext() {}
 
 std::string CrossTranslationUnit::getLookupName(const NamedDecl *ND) {
   SmallString<128> DeclUSR;
@@ -40,11 +40,11 @@ std::string CrossTranslationUnit::getLookupName(const NamedDecl *ND) {
   return DeclUSR.str();
 }
 
-/// Recursively visit the funtion decls of a DeclContext, and looks up a
-/// function based on mangled name.
+/// Recursively visits the funtion decls of a DeclContext, and looks up a
+/// function based on USRs.
 const FunctionDecl *
-CrossTranslationUnit::findFunctionInDeclContext(const DeclContext *DC,
-                                                StringRef LookupFnName) {
+CrossTranslationUnitContext::findFunctionInDeclContext(const DeclContext *DC,
+                                                       StringRef LookupFnName) {
   if (!DC)
     return nullptr;
   for (const Decl *D : DC->decls()) {
@@ -63,7 +63,7 @@ CrossTranslationUnit::findFunctionInDeclContext(const DeclContext *DC,
   return nullptr;
 }
 
-const FunctionDecl *CrossTranslationUnit::getCrossTUDefinition(
+const FunctionDecl *CrossTranslationUnitContext::getCrossTUDefinition(
     const FunctionDecl *FD, StringRef CrossTUDir, StringRef IndexName) {
   assert(!FD->hasBody() && "FD has a definition in current translation unit!");
 
@@ -147,7 +147,8 @@ const FunctionDecl *CrossTranslationUnit::getCrossTUDefinition(
   return nullptr;
 }
 
-ASTImporter &CrossTranslationUnit::getOrCreateASTImporter(ASTContext &From) {
+ASTImporter &
+CrossTranslationUnitContext::getOrCreateASTImporter(ASTContext &From) {
   auto I = ASTUnitImporterMap.find(From.getTranslationUnitDecl());
   if (I != ASTUnitImporterMap.end())
     return *I->second;

@@ -41,10 +41,10 @@ namespace cross_tu {
 /// the locations of the AST files for each function definition.
 ///
 /// Note that this class also implements caching.
-class CrossTranslationUnit {
+class CrossTranslationUnitContext {
 public:
-  CrossTranslationUnit(CompilerInstance &CI);
-  ~CrossTranslationUnit();
+  CrossTranslationUnitContext(CompilerInstance &CI);
+  ~CrossTranslationUnitContext();
 
   /// \brief This function can load a function definition from an external AST
   ///        file and merge it into the original AST.

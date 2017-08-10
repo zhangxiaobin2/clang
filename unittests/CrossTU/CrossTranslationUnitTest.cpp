@@ -62,7 +62,7 @@ public:
   }
 
 private:
-  CrossTranslationUnit CTU;
+  CrossTranslationUnitContext CTU;
   bool *Success;
 };
 
