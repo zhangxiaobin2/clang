@@ -57,7 +57,7 @@ private:
   void handleDecl(const Decl *D);
 
   ASTContext &Ctx;
-  std::vector<IndexEntry> Index;
+  llvm::StringMap<std::string> Index;
   std::string CurrentFileName;
 };
 
@@ -85,8 +85,7 @@ void MapFunctionNamesConsumer::handleDecl(const Decl *D) {
         case VisibleNoLinkage:
         case UniqueExternalLinkage:
           if (SM.isInMainFile(Body->getLocStart()))
-            Index.push_back(
-                IndexEntry{LookupName.str().str(), CurrentFileName});
+            Index[LookupName.str().str()] = CurrentFileName;
         default:
           break;
         }

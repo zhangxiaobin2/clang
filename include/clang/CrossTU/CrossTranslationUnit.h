@@ -63,12 +63,7 @@ private:
 llvm::Expected<llvm::StringMap<std::string>>
 parseCrossTUIndex(StringRef IndexPath, StringRef CrossTUDir);
 
-struct IndexEntry {
-  std::string USR;
-  std::string FilePath;
-};
-
-std::string createCrossTUIndexString(const std::vector<IndexEntry> &Index);
+std::string createCrossTUIndexString(const llvm::StringMap<std::string> &Index);
 
 /// \brief This class can be used for tools that requires cross translation
 ///        unit capability.

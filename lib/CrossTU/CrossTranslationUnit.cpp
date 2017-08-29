@@ -97,10 +97,11 @@ parseCrossTUIndex(StringRef IndexPath, StringRef CrossTUDir) {
   return Result;
 }
 
-std::string createCrossTUIndexString(const std::vector<IndexEntry> &Index) {
+std::string
+createCrossTUIndexString(const llvm::StringMap<std::string> &Index) {
   std::stringstream Result;
-  for (const IndexEntry &E : Index) {
-    Result << E.USR << " " << E.FilePath << '\n';
+  for (const auto &E : Index) {
+    Result << E.getKey().str() << " " << E.getValue() << '\n';
   }
   return Result.str();
 }
