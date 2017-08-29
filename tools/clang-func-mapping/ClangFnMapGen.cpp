@@ -19,6 +19,7 @@
 #include "clang/AST/StmtVisitor.h"
 #include "clang/Basic/SourceManager.h"
 #include "clang/Basic/TargetInfo.h"
+#include "clang/CrossTU/CrossTranslationUnit.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Frontend/FrontendActions.h"
 #include "clang/Index/USRGeneration.h"
@@ -33,6 +34,7 @@
 
 using namespace llvm;
 using namespace clang;
+using namespace clang::cross_tu;
 using namespace clang::tooling;
 
 static cl::OptionCategory ClangFnMapGenCategory("clang-fnmapgen options");
@@ -43,7 +45,7 @@ public:
 
   ~MapFunctionNamesConsumer() {
     // Flush results to standard output.
-    llvm::outs() << DefinedFuncsStr.str();
+    llvm::outs() << createCrossTUIndexString(Index);
   }
 
   virtual void HandleTranslationUnit(ASTContext &Ctx) {
@@ -55,7 +57,7 @@ private:
   void handleDecl(const Decl *D);
 
   ASTContext &Ctx;
-  std::stringstream DefinedFuncsStr;
+  std::vector<IndexEntry> Index;
   std::string CurrentFileName;
 };
 
@@ -83,8 +85,8 @@ void MapFunctionNamesConsumer::handleDecl(const Decl *D) {
         case VisibleNoLinkage:
         case UniqueExternalLinkage:
           if (SM.isInMainFile(Body->getLocStart()))
-            DefinedFuncsStr << LookupName.str().str() << " " << CurrentFileName
-                            << "\n";
+            Index.push_back(
+                IndexEntry{LookupName.str().str(), CurrentFileName});
         default:
           break;
         }

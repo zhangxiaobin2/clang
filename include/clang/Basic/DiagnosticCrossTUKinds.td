@@ -10,6 +10,6 @@
 let Component = "CrossTU" in {
 
 def err_fnmap_parsing : Error<
-  "error parsing CrossTU index file: '%0' line: %1 'USR filename' format "
+  "error parsing index file: '%0' line: %1 'UniqueID filename' format "
   "expected">;
 }

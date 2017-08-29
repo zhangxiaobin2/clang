@@ -12,6 +12,7 @@ add_clang_executable(clang-func-mapping
 target_link_libraries(clang-func-mapping
   clangAST
   clangBasic
+  clangCrossTU
   clangFrontend
   clangIndex
   clangTooling

@@ -18,6 +18,7 @@
 #include "clang/Basic/LLVM.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringMap.h"
+#include "llvm/Support/Error.h"
 
 namespace clang {
 class CompilerInstance;
@@ -30,6 +31,44 @@ class NamedDecl;
 class TranslationUnitDecl;
 
 namespace cross_tu {
+
+enum class index_error_code {
+  unspecified = 1,
+  missing_index_file,
+  invalid_index_format,
+  multiple_definitions,
+  missing_definition
+};
+
+class IndexError : public llvm::ErrorInfo<IndexError> {
+public:
+  static char ID;
+  IndexError(index_error_code C) : Code(C), LineNo(0) {}
+  IndexError(index_error_code C, int LineNo) : Code(C), LineNo(LineNo) {}
+  void log(raw_ostream &OS) const override;
+  std::error_code convertToErrorCode() const override;
+  index_error_code getCode() const { return Code; }
+  int getLineNum() const { return LineNo; }
+
+private:
+  index_error_code Code;
+  int LineNo;
+};
+
+/// \brief This function can parse an index file that determines which
+///        translation unit contains which definition.
+///
+/// The index file format is the following:
+/// each line consists of an USR separated by a filepath.
+llvm::Expected<llvm::StringMap<std::string>>
+parseCrossTUIndex(StringRef IndexPath, StringRef CrossTUDir);
+
+struct IndexEntry {
+  std::string USR;
+  std::string FilePath;
+};
+
+std::string createCrossTUIndexString(const std::vector<IndexEntry> &Index);
 
 /// \brief This class can be used for tools that requires cross translation
 ///        unit capability.
@@ -56,6 +95,8 @@ public:
   /// found in the index the corresponding AST file will be loaded and the
   /// definition of the function will be merged into the original AST using
   /// the AST Importer. The declaration with the definition will be returned.
+  /// If no suitable definition is found in the index file, null will be
+  /// returned.
   ///
   /// Note that the AST files should also be in the \p CrossTUDir.
   const FunctionDecl *getCrossTUDefinition(const FunctionDecl *FD,
