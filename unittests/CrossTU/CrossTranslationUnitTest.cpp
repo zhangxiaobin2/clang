@@ -7,8 +7,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "clang/AST/ASTConsumer.h"
 #include "clang/CrossTU/CrossTranslationUnit.h"
+#include "clang/AST/ASTConsumer.h"
 #include "clang/Frontend/FrontendAction.h"
 #include "clang/Tooling/Tooling.h"
 #include "llvm/Config/llvm-config.h"
@@ -92,6 +92,30 @@ TEST(CrossTranslationUnit, CanLoadFunctionDefinition) {
   EXPECT_FALSE((bool)llvm::sys::fs::remove(ASTFileName));
   EXPECT_TRUE(llvm::sys::fs::exists(DefinitionFileName));
   EXPECT_FALSE((bool)llvm::sys::fs::remove(DefinitionFileName));
+}
+
+TEST(CrossTranslationUnit, IndexFormatCanBeParsed) {
+  llvm::StringMap<std::string> Index;
+  Index["a"] = "b";
+  Index["c"] = "d";
+  Index["e"] = "f";
+  std::string IndexText = createCrossTUIndexString(Index);
+  std::error_code EC;
+  llvm::raw_fd_ostream OS(IndexFileName, EC, llvm::sys::fs::F_Text);
+  OS << IndexText;
+  OS.flush();
+  EXPECT_TRUE(llvm::sys::fs::exists(IndexFileName));
+  llvm::Expected<llvm::StringMap<std::string>> IndexOrErr =
+      parseCrossTUIndex(IndexFileName, "");
+  EXPECT_TRUE((bool)IndexOrErr);
+  llvm::StringMap<std::string> ParsedIndex = IndexOrErr.get();
+  for (const auto &E : Index) {
+    EXPECT_TRUE(ParsedIndex.count(E.getKey()));
+    EXPECT_EQ(ParsedIndex[E.getKey()], E.getValue());
+  }
+  for (const auto &E : ParsedIndex)
+    EXPECT_TRUE(Index.count(E.getKey()));
+  EXPECT_FALSE((bool)llvm::sys::fs::remove(IndexFileName));
 }
 
 } // end namespace cross_tu

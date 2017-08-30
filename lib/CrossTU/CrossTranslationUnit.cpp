@@ -84,7 +84,7 @@ parseCrossTUIndex(StringRef IndexPath, StringRef CrossTUDir) {
       FunctionName = LineRef.substr(0, Pos);
       if (Result.count(FunctionName))
         return llvm::make_error<IndexError>(
-            index_error_code::multiple_definitions);
+            index_error_code::multiple_definitions, LineNo + 1);
       FileName = LineRef.substr(Pos + 1);
       SmallString<256> FilePath = CrossTUDir;
       llvm::sys::path::append(FilePath, FileName);
@@ -166,13 +166,12 @@ const FunctionDecl *CrossTranslationUnitContext::getCrossTUDefinition(
                 << ExternalFunctionMap
                 << "required by the CrossTU functionality";
             break;
-
           case index_error_code::invalid_index_format:
             Context.getDiagnostics().Report(diag::err_fnmap_parsing)
                 << ExternalFunctionMap << IE.getLineNum();
           case index_error_code::multiple_definitions:
-            // FIXME: do we want to return nullptr or error code or issue a
-            //        warning?
+            Context.getDiagnostics().Report(diag::err_multiple_def_index)
+                << IE.getLineNum();
             break;
           default:
             llvm_unreachable("Unexpected IndexError.");
