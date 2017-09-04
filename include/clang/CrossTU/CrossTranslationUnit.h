@@ -37,7 +37,8 @@ enum class index_error_code {
   missing_index_file,
   invalid_index_format,
   multiple_definitions,
-  missing_definition
+  missing_definition,
+  failed_import
 };
 
 class IndexError : public llvm::ErrorInfo<IndexError> {
@@ -55,17 +56,20 @@ private:
   int LineNo;
 };
 
-/// \brief This function can parse an index file that determines which
+/// \brief This function parses an index file that determines which
 ///        translation unit contains which definition.
 ///
 /// The index file format is the following:
-/// each line consists of an USR separated by a filepath.
+/// each line consists of an USR and a filepath separated by a space.
+/// 
+/// \return Returns a map where the USR is the key and the filepath is the value
+///         or an error.
 llvm::Expected<llvm::StringMap<std::string>>
 parseCrossTUIndex(StringRef IndexPath, StringRef CrossTUDir);
 
 std::string createCrossTUIndexString(const llvm::StringMap<std::string> &Index);
 
-/// \brief This class can be used for tools that requires cross translation
+/// \brief This class is used for tools that requires cross translation
 ///        unit capability.
 ///
 /// This class can load function definitions from external AST files.

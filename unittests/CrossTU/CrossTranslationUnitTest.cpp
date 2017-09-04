@@ -37,7 +37,7 @@ public:
       if (FD && FD->getName() == "f")
         break;
     }
-    assert(FD);
+    assert(FD && FD->getName() == "f");
     bool OrigFDHasBody = FD->hasBody();
 
     // Prepare the index file and the AST file.

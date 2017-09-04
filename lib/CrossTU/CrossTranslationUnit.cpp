@@ -49,6 +49,8 @@ public:
       return "Multiple definitions in the index file.";
     case index_error_code::missing_definition:
       return "Missing definition from the index file.";
+    case index_error_code::failed_import:
+      return "Failed to import the definition.";
     }
     llvm_unreachable("Unrecognized index_error_code.");
   }
@@ -57,7 +59,7 @@ public:
 static llvm::ManagedStatic<IndexErrorCategory> Category;
 } // end anonymous namespace
 
-char IndexError::ID = 0;
+char IndexError::ID;
 
 void IndexError::log(raw_ostream &OS) const {
   OS << Category->message(static_cast<int>(Code)) << '\n';
@@ -74,24 +76,23 @@ parseCrossTUIndex(StringRef IndexPath, StringRef CrossTUDir) {
   if (!ExternalFnMapFile)
     return llvm::make_error<IndexError>(index_error_code::missing_index_file);
 
-  StringRef FunctionName, FileName;
   std::string Line;
-  unsigned LineNo = 0;
+  unsigned LineNo = 1;
   while (std::getline(ExternalFnMapFile, Line)) {
-    size_t Pos = Line.find(" ");
-    StringRef LineRef{Line};
+    const size_t Pos = Line.find(" ");
     if (Pos > 0 && Pos != std::string::npos) {
-      FunctionName = LineRef.substr(0, Pos);
-      if (Result.count(FunctionName))
+      StringRef LineRef{Line};
+      StringRef FunctionLookupName = LineRef.substr(0, Pos);
+      if (Result.count(FunctionLookupName))
         return llvm::make_error<IndexError>(
-            index_error_code::multiple_definitions, LineNo + 1);
-      FileName = LineRef.substr(Pos + 1);
+            index_error_code::multiple_definitions, LineNo);
+      StringRef FileName = LineRef.substr(Pos + 1);
       SmallString<256> FilePath = CrossTUDir;
       llvm::sys::path::append(FilePath, FileName);
-      Result[FunctionName] = FilePath.str().str();
+      Result[FunctionLookupName] = FilePath.str().str();
     } else
       return llvm::make_error<IndexError>(
-          index_error_code::invalid_index_format, LineNo + 1);
+          index_error_code::invalid_index_format, LineNo);
     LineNo++;
   }
   return Result;
@@ -99,10 +100,9 @@ parseCrossTUIndex(StringRef IndexPath, StringRef CrossTUDir) {
 
 std::string
 createCrossTUIndexString(const llvm::StringMap<std::string> &Index) {
-  std::stringstream Result;
-  for (const auto &E : Index) {
+  std::ostringstream Result;
+  for (const auto &E : Index)
     Result << E.getKey().str() << " " << E.getValue() << '\n';
-  }
   return Result.str();
 }
 
@@ -118,7 +118,7 @@ std::string CrossTranslationUnitContext::getLookupName(const NamedDecl *ND) {
   return DeclUSR.str();
 }
 
-/// Recursively visits the funtion decls of a DeclContext, and looks up a
+/// Recursively visits the function decls of a DeclContext, and looks up a
 /// function based on USRs.
 const FunctionDecl *
 CrossTranslationUnitContext::findFunctionInDeclContext(const DeclContext *DC,
@@ -145,7 +145,7 @@ const FunctionDecl *CrossTranslationUnitContext::getCrossTUDefinition(
     const FunctionDecl *FD, StringRef CrossTUDir, StringRef IndexName) {
   assert(!FD->hasBody() && "FD has a definition in current translation unit!");
 
-  std::string LookupFnName = getLookupName(FD);
+  const std::string LookupFnName = getLookupName(FD);
   if (LookupFnName.empty())
     return nullptr;
   ASTUnit *Unit = nullptr;
@@ -182,11 +182,10 @@ const FunctionDecl *CrossTranslationUnitContext::getCrossTUDefinition(
       }
     }
 
-    StringRef ASTFileName;
     auto It = FunctionFileMap.find(LookupFnName);
     if (It == FunctionFileMap.end())
       return nullptr; // No definition found even in some other build unit.
-    ASTFileName = It->second;
+    StringRef ASTFileName = It->second;
     auto ASTCacheEntry = FileASTUnitMap.find(ASTFileName);
     if (ASTCacheEntry == FileASTUnitMap.end()) {
       IntrusiveRefCntPtr<DiagnosticOptions> DiagOpts = new DiagnosticOptions();
