@@ -51,6 +51,10 @@ public:
       return "Missing definition from the index file.";
     case index_error_code::failed_import:
       return "Failed to import the definition.";
+    case index_error_code::failed_to_get_external_ast:
+      return "Failed to load external AST source.";
+    case index_error_code::failed_to_generate_usr:
+      return "Failed to generate USR.";
     }
     llvm_unreachable("Unrecognized index_error_code.");
   }
@@ -71,11 +75,11 @@ std::error_code IndexError::convertToErrorCode() const {
 
 llvm::Expected<llvm::StringMap<std::string>>
 parseCrossTUIndex(StringRef IndexPath, StringRef CrossTUDir) {
-  llvm::StringMap<std::string> Result;
   std::ifstream ExternalFnMapFile(IndexPath);
   if (!ExternalFnMapFile)
     return llvm::make_error<IndexError>(index_error_code::missing_index_file);
 
+  llvm::StringMap<std::string> Result;
   std::string Line;
   unsigned LineNo = 1;
   while (std::getline(ExternalFnMapFile, Line)) {
@@ -141,15 +145,41 @@ CrossTranslationUnitContext::findFunctionInDeclContext(const DeclContext *DC,
   return nullptr;
 }
 
-const FunctionDecl *CrossTranslationUnitContext::getCrossTUDefinition(
-    const FunctionDecl *FD, StringRef CrossTUDir, StringRef IndexName) {
+llvm::Expected<const FunctionDecl *>
+CrossTranslationUnitContext::getCrossTUDefinition(const FunctionDecl *FD,
+                                                  StringRef CrossTUDir,
+                                                  StringRef IndexName) {
   assert(!FD->hasBody() && "FD has a definition in current translation unit!");
-
   const std::string LookupFnName = getLookupName(FD);
   if (LookupFnName.empty())
-    return nullptr;
+    return llvm::make_error<IndexError>(
+        index_error_code::failed_to_generate_usr);
+  llvm::Expected<ASTUnit *> ASTUnitOrError =
+      loadExternalAST(LookupFnName, CrossTUDir, IndexName);
+  if (!ASTUnitOrError)
+    return ASTUnitOrError.takeError();
+  ASTUnit *Unit = *ASTUnitOrError;
+  if (!Unit)
+    return llvm::make_error<IndexError>(
+        index_error_code::failed_to_get_external_ast);
+  assert(&Unit->getFileManager() ==
+         &Unit->getASTContext().getSourceManager().getFileManager());
+
+  TranslationUnitDecl *TU = Unit->getASTContext().getTranslationUnitDecl();
+  if (const FunctionDecl *ResultDecl =
+          findFunctionInDeclContext(TU, LookupFnName))
+    return importDefinition(ResultDecl, Unit);
+  return llvm::make_error<IndexError>(index_error_code::failed_import);
+}
+
+llvm::Expected<ASTUnit *> CrossTranslationUnitContext::loadExternalAST(
+    StringRef LookupName, StringRef CrossTUDir, StringRef IndexName) {
+  // FIXME: The current implementation only supports loading functions with
+  //        a lookup name from a single translation unit. If multiple
+  //        translation units contains functions with the same lookup name an
+  //        error will be returned.
   ASTUnit *Unit = nullptr;
-  auto FnUnitCacheEntry = FunctionASTUnitMap.find(LookupFnName);
+  auto FnUnitCacheEntry = FunctionASTUnitMap.find(LookupName);
   if (FnUnitCacheEntry == FunctionASTUnitMap.end()) {
     if (FunctionFileMap.empty()) {
       SmallString<256> ExternalFunctionMap = CrossTUDir;
@@ -159,7 +189,11 @@ const FunctionDecl *CrossTranslationUnitContext::getCrossTUDefinition(
       if (IndexOrErr) {
         FunctionFileMap = *IndexOrErr;
       } else {
-        handleErrors(IndexOrErr.takeError(), [&](const IndexError &IE) {
+        llvm::Error PropagatedErr(llvm::Error::success());
+        handleAllErrors(IndexOrErr.takeError(), [&](const IndexError &IE) {
+          (bool)PropagatedErr;
+          PropagatedErr =
+              llvm::make_error<IndexError>(IE.getCode(), IE.getLineNum());
           switch (IE.getCode()) {
           case index_error_code::missing_index_file:
             Context.getDiagnostics().Report(diag::err_fe_error_opening)
@@ -178,13 +212,13 @@ const FunctionDecl *CrossTranslationUnitContext::getCrossTUDefinition(
             break;
           }
         });
-        return nullptr;
+        return PropagatedErr;
       }
     }
 
-    auto It = FunctionFileMap.find(LookupFnName);
+    auto It = FunctionFileMap.find(LookupName);
     if (It == FunctionFileMap.end())
-      return nullptr; // No definition found even in some other build unit.
+      return llvm::make_error<IndexError>(index_error_code::missing_definition);
     StringRef ASTFileName = It->second;
     auto ASTCacheEntry = FileASTUnitMap.find(ASTFileName);
     if (ASTCacheEntry == FileASTUnitMap.end()) {
@@ -203,26 +237,22 @@ const FunctionDecl *CrossTranslationUnitContext::getCrossTUDefinition(
     } else {
       Unit = ASTCacheEntry->second.get();
     }
-    FunctionASTUnitMap[LookupFnName] = Unit;
+    FunctionASTUnitMap[LookupName] = Unit;
   } else {
     Unit = FnUnitCacheEntry->second;
   }
+  return Unit;
+}
 
-  if (!Unit)
-    return nullptr;
-  assert(&Unit->getFileManager() ==
-         &Unit->getASTContext().getSourceManager().getFileManager());
+llvm::Expected<const FunctionDecl *>
+CrossTranslationUnitContext::importDefinition(const FunctionDecl *FD,
+                                              ASTUnit *Unit) {
   ASTImporter &Importer = getOrCreateASTImporter(Unit->getASTContext());
-  TranslationUnitDecl *TU = Unit->getASTContext().getTranslationUnitDecl();
-  if (const FunctionDecl *ResultDecl =
-          findFunctionInDeclContext(TU, LookupFnName)) {
-    auto *ToDecl = cast<FunctionDecl>(
-        Importer.Import(const_cast<FunctionDecl *>(ResultDecl)));
-    assert(ToDecl->hasBody());
-    assert(FD->hasBody() && "Functions already imported should have body.");
-    return ToDecl;
-  }
-  return nullptr;
+  auto *ToDecl =
+      cast<FunctionDecl>(Importer.Import(const_cast<FunctionDecl *>(FD)));
+  assert(ToDecl->hasBody());
+  assert(FD->hasBody() && "Functions already imported should have body.");
+  return ToDecl;
 }
 
 ASTImporter &

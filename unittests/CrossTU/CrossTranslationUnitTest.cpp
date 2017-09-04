@@ -55,8 +55,10 @@ public:
     ASTWithDefinition->Save(ASTFileName);
 
     // Load the definition from the AST file.
-    const FunctionDecl *NewFD =
+    llvm::Expected<const FunctionDecl *> NewFDorError =
         CTU.getCrossTUDefinition(FD, ".", IndexFileName);
+    assert(NewFDorError);
+    const FunctionDecl *NewFD = *NewFDorError;
 
     *Success = NewFD && NewFD->hasBody() && !OrigFDHasBody;
   }

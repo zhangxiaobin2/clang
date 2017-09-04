@@ -17,6 +17,7 @@
 
 #include "clang/Basic/LLVM.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/Error.h"
 
@@ -38,7 +39,9 @@ enum class index_error_code {
   invalid_index_format,
   multiple_definitions,
   missing_definition,
-  failed_import
+  failed_import,
+  failed_to_get_external_ast,
+  failed_to_generate_usr
 };
 
 class IndexError : public llvm::ErrorInfo<IndexError> {
@@ -61,7 +64,7 @@ private:
 ///
 /// The index file format is the following:
 /// each line consists of an USR and a filepath separated by a space.
-/// 
+///
 /// \return Returns a map where the USR is the key and the filepath is the value
 ///         or an error.
 llvm::Expected<llvm::StringMap<std::string>>
@@ -84,7 +87,7 @@ public:
   CrossTranslationUnitContext(CompilerInstance &CI);
   ~CrossTranslationUnitContext();
 
-  /// \brief This function can load a function definition from an external AST
+  /// \brief This function loads a function definition from an external AST
   ///        file and merge it into the original AST.
   ///
   /// This method should only be used on functions that have no definitions in
@@ -93,18 +96,45 @@ public:
   /// \p CrossTUDir directory, called \p IndexName. In case the declaration is
   /// found in the index the corresponding AST file will be loaded and the
   /// definition of the function will be merged into the original AST using
-  /// the AST Importer. The declaration with the definition will be returned.
-  /// If no suitable definition is found in the index file, null will be
-  /// returned.
+  /// the AST Importer.
+  ///
+  /// \return The declaration with the definition will be returned.
+  /// If no suitable definition is found in the index file or multiple
+  /// definitions found error will be returned.
   ///
   /// Note that the AST files should also be in the \p CrossTUDir.
-  const FunctionDecl *getCrossTUDefinition(const FunctionDecl *FD,
-                                           StringRef CrossTUDir,
-                                           StringRef IndexName);
+  llvm::Expected<const FunctionDecl *>
+  getCrossTUDefinition(const FunctionDecl *FD, StringRef CrossTUDir,
+                       StringRef IndexName);
+
+  /// \brief This function loads a function definition from an external AST
+  ///        file.
+  ///
+  /// A function definition with the same declaration will be looked up in the
+  /// index file which should be in the \p CrossTUDir directory, called
+  /// \p IndexName. In case the declaration is found in the index the
+  /// corresponding AST file will be loaded.
+  ///
+  /// \return Returns a map with the loaded AST Units and the declarations
+  /// with the definitions.
+  /// Note that, it might return multiple definitions or empty map.
+  ///
+  /// Note that the AST files should also be in the \p CrossTUDir.
+  llvm::Expected<ASTUnit *> loadExternalAST(StringRef LookupName,
+                                            StringRef CrossTUDir,
+                                            StringRef IndexName);
+
+  /// \brief This function merges a definition from a separate AST Unit into
+  ///        the current one.
+  ///
+  /// \return Returns the resulting definition or an error.
+  llvm::Expected<const FunctionDecl *> importDefinition(const FunctionDecl *FD,
+                                                        ASTUnit *Unit);
+
+  std::string getLookupName(const NamedDecl *ND);
 
 private:
   ASTImporter &getOrCreateASTImporter(ASTContext &From);
-  std::string getLookupName(const NamedDecl *ND);
   const FunctionDecl *findFunctionInDeclContext(const DeclContext *DC,
                                                 StringRef LookupFnName);
 
