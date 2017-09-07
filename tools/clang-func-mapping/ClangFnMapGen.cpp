@@ -53,7 +53,6 @@ public:
   }
 
 private:
-  std::string getLookupName(const FunctionDecl *FD);
   void handleDecl(const Decl *D);
 
   ASTContext &Ctx;
@@ -68,9 +67,7 @@ void MapFunctionNamesConsumer::handleDecl(const Decl *D) {
   if (const auto *FD = dyn_cast<FunctionDecl>(D)) {
     if (FD->isThisDeclarationADefinition()) {
       if (const Stmt *Body = FD->getBody()) {
-        SmallString<128> LookupName;
-        bool Res = index::generateUSRForDecl(D, LookupName);
-        assert(!Res);
+        std::string LookupName = CrossTranslationUnitContext::getLookupName(FD);
         const SourceManager &SM = Ctx.getSourceManager();
         if (CurrentFileName.empty()) {
           CurrentFileName =
@@ -84,7 +81,7 @@ void MapFunctionNamesConsumer::handleDecl(const Decl *D) {
         case VisibleNoLinkage:
         case UniqueExternalLinkage:
           if (SM.isInMainFile(Body->getLocStart()))
-            Index[LookupName.str().str()] = CurrentFileName;
+            Index[LookupName] = CurrentFileName;
         default:
           break;
         }

@@ -48,14 +48,17 @@ class IndexError : public llvm::ErrorInfo<IndexError> {
 public:
   static char ID;
   IndexError(index_error_code C) : Code(C), LineNo(0) {}
-  IndexError(index_error_code C, int LineNo) : Code(C), LineNo(LineNo) {}
+  IndexError(index_error_code C, std::string FileName, int LineNo = 0)
+      : Code(C), FileName(std::move(FileName)), LineNo(LineNo) {}
   void log(raw_ostream &OS) const override;
   std::error_code convertToErrorCode() const override;
   index_error_code getCode() const { return Code; }
   int getLineNum() const { return LineNo; }
+  std::string getFileName() const { return FileName; }
 
 private:
   index_error_code Code;
+  std::string FileName;
   int LineNo;
 };
 
@@ -115,9 +118,8 @@ public:
   /// \p IndexName. In case the declaration is found in the index the
   /// corresponding AST file will be loaded.
   ///
-  /// \return Returns a map with the loaded AST Units and the declarations
-  /// with the definitions.
-  /// Note that, it might return multiple definitions or empty map.
+  /// \return Returns an ASTUnit that contains the definition of the looked up
+  /// function.
   ///
   /// Note that the AST files should also be in the \p CrossTUDir.
   llvm::Expected<ASTUnit *> loadExternalAST(StringRef LookupName,
@@ -125,13 +127,17 @@ public:
                                             StringRef IndexName);
 
   /// \brief This function merges a definition from a separate AST Unit into
-  ///        the current one.
+  ///        the current one which was created by the compiler instance that
+  ///        was passed to the constructor.
   ///
   /// \return Returns the resulting definition or an error.
-  llvm::Expected<const FunctionDecl *> importDefinition(const FunctionDecl *FD,
-                                                        ASTUnit *Unit);
+  llvm::Expected<const FunctionDecl *> importDefinition(const FunctionDecl *FD);
 
-  std::string getLookupName(const NamedDecl *ND);
+  /// \brief Get a name to identify a function.
+  static std::string getLookupName(const NamedDecl *ND);
+
+  /// \brief Emit diagnostics for the user for potential configuration errors.
+  void emitCrossTUDiagnostics(const IndexError &IE);
 
 private:
   ASTImporter &getOrCreateASTImporter(ASTContext &From);

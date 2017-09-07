@@ -77,7 +77,8 @@ llvm::Expected<llvm::StringMap<std::string>>
 parseCrossTUIndex(StringRef IndexPath, StringRef CrossTUDir) {
   std::ifstream ExternalFnMapFile(IndexPath);
   if (!ExternalFnMapFile)
-    return llvm::make_error<IndexError>(index_error_code::missing_index_file);
+    return llvm::make_error<IndexError>(index_error_code::missing_index_file,
+                                        IndexPath.str());
 
   llvm::StringMap<std::string> Result;
   std::string Line;
@@ -89,14 +90,14 @@ parseCrossTUIndex(StringRef IndexPath, StringRef CrossTUDir) {
       StringRef FunctionLookupName = LineRef.substr(0, Pos);
       if (Result.count(FunctionLookupName))
         return llvm::make_error<IndexError>(
-            index_error_code::multiple_definitions, LineNo);
+            index_error_code::multiple_definitions, IndexPath.str(), LineNo);
       StringRef FileName = LineRef.substr(Pos + 1);
       SmallString<256> FilePath = CrossTUDir;
       llvm::sys::path::append(FilePath, FileName);
       Result[FunctionLookupName] = FilePath.str().str();
     } else
       return llvm::make_error<IndexError>(
-          index_error_code::invalid_index_format, LineNo);
+          index_error_code::invalid_index_format, IndexPath.str(), LineNo);
     LineNo++;
   }
   return Result;
@@ -168,8 +169,26 @@ CrossTranslationUnitContext::getCrossTUDefinition(const FunctionDecl *FD,
   TranslationUnitDecl *TU = Unit->getASTContext().getTranslationUnitDecl();
   if (const FunctionDecl *ResultDecl =
           findFunctionInDeclContext(TU, LookupFnName))
-    return importDefinition(ResultDecl, Unit);
+    return importDefinition(ResultDecl);
   return llvm::make_error<IndexError>(index_error_code::failed_import);
+}
+
+void CrossTranslationUnitContext::emitCrossTUDiagnostics(const IndexError &IE) {
+  switch (IE.getCode()) {
+  case index_error_code::missing_index_file:
+    Context.getDiagnostics().Report(diag::err_fe_error_opening)
+        << IE.getFileName() << "required by the CrossTU functionality";
+    break;
+  case index_error_code::invalid_index_format:
+    Context.getDiagnostics().Report(diag::err_fnmap_parsing)
+        << IE.getFileName() << IE.getLineNum();
+  case index_error_code::multiple_definitions:
+    Context.getDiagnostics().Report(diag::err_multiple_def_index)
+        << IE.getLineNum();
+    break;
+  default:
+    break;
+  }
 }
 
 llvm::Expected<ASTUnit *> CrossTranslationUnitContext::loadExternalAST(
@@ -186,34 +205,10 @@ llvm::Expected<ASTUnit *> CrossTranslationUnitContext::loadExternalAST(
       llvm::sys::path::append(ExternalFunctionMap, IndexName);
       llvm::Expected<llvm::StringMap<std::string>> IndexOrErr =
           parseCrossTUIndex(ExternalFunctionMap, CrossTUDir);
-      if (IndexOrErr) {
+      if (IndexOrErr)
         FunctionFileMap = *IndexOrErr;
-      } else {
-        llvm::Error PropagatedErr(llvm::Error::success());
-        handleAllErrors(IndexOrErr.takeError(), [&](const IndexError &IE) {
-          (bool)PropagatedErr;
-          PropagatedErr =
-              llvm::make_error<IndexError>(IE.getCode(), IE.getLineNum());
-          switch (IE.getCode()) {
-          case index_error_code::missing_index_file:
-            Context.getDiagnostics().Report(diag::err_fe_error_opening)
-                << ExternalFunctionMap
-                << "required by the CrossTU functionality";
-            break;
-          case index_error_code::invalid_index_format:
-            Context.getDiagnostics().Report(diag::err_fnmap_parsing)
-                << ExternalFunctionMap << IE.getLineNum();
-          case index_error_code::multiple_definitions:
-            Context.getDiagnostics().Report(diag::err_multiple_def_index)
-                << IE.getLineNum();
-            break;
-          default:
-            llvm_unreachable("Unexpected IndexError.");
-            break;
-          }
-        });
-        return PropagatedErr;
-      }
+      else
+        return IndexOrErr.takeError();
     }
 
     auto It = FunctionFileMap.find(LookupName);
@@ -245,9 +240,8 @@ llvm::Expected<ASTUnit *> CrossTranslationUnitContext::loadExternalAST(
 }
 
 llvm::Expected<const FunctionDecl *>
-CrossTranslationUnitContext::importDefinition(const FunctionDecl *FD,
-                                              ASTUnit *Unit) {
-  ASTImporter &Importer = getOrCreateASTImporter(Unit->getASTContext());
+CrossTranslationUnitContext::importDefinition(const FunctionDecl *FD) {
+  ASTImporter &Importer = getOrCreateASTImporter(FD->getASTContext());
   auto *ToDecl =
       cast<FunctionDecl>(Importer.Import(const_cast<FunctionDecl *>(FD)));
   assert(ToDecl->hasBody());
