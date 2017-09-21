@@ -93,7 +93,10 @@ parseCrossTUIndex(StringRef IndexPath, StringRef CrossTUDir) {
             index_error_code::multiple_definitions, IndexPath.str(), LineNo);
       StringRef FileName = LineRef.substr(Pos + 1);
       SmallString<256> FilePath = CrossTUDir;
-      llvm::sys::path::append(FilePath, FileName);
+      if (llvm::sys::path::is_absolute(FileName))
+        FilePath = FileName;
+      else
+        llvm::sys::path::append(FilePath, FileName);
       Result[FunctionLookupName] = FilePath.str().str();
     } else
       return llvm::make_error<IndexError>(
@@ -201,10 +204,13 @@ llvm::Expected<ASTUnit *> CrossTranslationUnitContext::loadExternalAST(
   auto FnUnitCacheEntry = FunctionASTUnitMap.find(LookupName);
   if (FnUnitCacheEntry == FunctionASTUnitMap.end()) {
     if (FunctionFileMap.empty()) {
-      SmallString<256> ExternalFunctionMap = CrossTUDir;
-      llvm::sys::path::append(ExternalFunctionMap, IndexName);
+      SmallString<256> IndexFile = CrossTUDir;
+      if (llvm::sys::path::is_absolute(IndexName))
+        IndexFile = IndexName;
+      else
+        llvm::sys::path::append(IndexFile, IndexName);
       llvm::Expected<llvm::StringMap<std::string>> IndexOrErr =
-          parseCrossTUIndex(ExternalFunctionMap, CrossTUDir);
+          parseCrossTUIndex(IndexFile, CrossTUDir);
       if (IndexOrErr)
         FunctionFileMap = *IndexOrErr;
       else

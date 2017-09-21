@@ -12,7 +12,9 @@
 #include "clang/Frontend/FrontendAction.h"
 #include "clang/Tooling/Tooling.h"
 #include "llvm/Config/llvm-config.h"
+#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/ToolOutputFile.h"
 #include "gtest/gtest.h"
 #include <cassert>
 
@@ -20,9 +22,6 @@ namespace clang {
 namespace cross_tu {
 
 namespace {
-StringRef IndexFileName = "index.txt";
-StringRef ASTFileName = "f.ast";
-StringRef DefinitionFileName = "input.cc";
 
 class CTUASTConsumer : public clang::ASTConsumer {
 public:
@@ -41,23 +40,41 @@ public:
     bool OrigFDHasBody = FD->hasBody();
 
     // Prepare the index file and the AST file.
-    std::error_code EC;
-    llvm::raw_fd_ostream OS(IndexFileName, EC, llvm::sys::fs::F_Text);
-    OS << "c:@F@f#I# " << ASTFileName << "\n";
-    OS.flush();
+    int ASTFD;
+    llvm::SmallString<256> ASTFileName;
+    ASSERT_FALSE(
+        llvm::sys::fs::createTemporaryFile("f_ast", "ast", ASTFD, ASTFileName));
+    llvm::tool_output_file ASTFile(ASTFileName, ASTFD);
+
+    int IndexFD;
+    llvm::SmallString<256> IndexFileName;
+    ASSERT_FALSE(llvm::sys::fs::createTemporaryFile("index", "txt", IndexFD,
+                                                    IndexFileName));
+    llvm::tool_output_file IndexFile(IndexFileName, IndexFD);
+    IndexFile.os() << "c:@F@f#I# " << ASTFileName << "\n";
+    IndexFile.os().flush();
+    EXPECT_TRUE(llvm::sys::fs::exists(IndexFileName));
+
     StringRef SourceText = "int f(int) { return 0; }\n";
     // This file must exist since the saved ASTFile will reference it.
-    llvm::raw_fd_ostream OS2(DefinitionFileName, EC, llvm::sys::fs::F_Text);
-    OS2 << SourceText;
-    OS2.flush();
+    int SourceFD;
+    llvm::SmallString<256> SourceFileName;
+    ASSERT_FALSE(llvm::sys::fs::createTemporaryFile("input", "cpp", SourceFD,
+                                                    SourceFileName));
+    llvm::tool_output_file SourceFile(SourceFileName, SourceFD);
+    SourceFile.os() << SourceText;
+    SourceFile.os().flush();
+    EXPECT_TRUE(llvm::sys::fs::exists(SourceFileName));
+
     std::unique_ptr<ASTUnit> ASTWithDefinition =
-        tooling::buildASTFromCode(SourceText);
-    ASTWithDefinition->Save(ASTFileName);
+        tooling::buildASTFromCode(SourceText, SourceFileName);
+    ASTWithDefinition->Save(ASTFileName.str());
+    EXPECT_TRUE(llvm::sys::fs::exists(ASTFileName));
 
     // Load the definition from the AST file.
     llvm::Expected<const FunctionDecl *> NewFDorError =
-        CTU.getCrossTUDefinition(FD, ".", IndexFileName);
-    assert(NewFDorError);
+        CTU.getCrossTUDefinition(FD, "", IndexFileName);
+    EXPECT_TRUE((bool)NewFDorError);
     const FunctionDecl *NewFD = *NewFDorError;
 
     *Success = NewFD && NewFD->hasBody() && !OrigFDHasBody;
@@ -88,12 +105,6 @@ TEST(CrossTranslationUnit, CanLoadFunctionDefinition) {
   bool Success = false;
   EXPECT_TRUE(tooling::runToolOnCode(new CTUAction(&Success), "int f(int);"));
   EXPECT_TRUE(Success);
-  EXPECT_TRUE(llvm::sys::fs::exists(IndexFileName));
-  EXPECT_FALSE((bool)llvm::sys::fs::remove(IndexFileName));
-  EXPECT_TRUE(llvm::sys::fs::exists(ASTFileName));
-  EXPECT_FALSE((bool)llvm::sys::fs::remove(ASTFileName));
-  EXPECT_TRUE(llvm::sys::fs::exists(DefinitionFileName));
-  EXPECT_FALSE((bool)llvm::sys::fs::remove(DefinitionFileName));
 }
 
 TEST(CrossTranslationUnit, IndexFormatCanBeParsed) {
@@ -102,10 +113,14 @@ TEST(CrossTranslationUnit, IndexFormatCanBeParsed) {
   Index["c"] = "d";
   Index["e"] = "f";
   std::string IndexText = createCrossTUIndexString(Index);
-  std::error_code EC;
-  llvm::raw_fd_ostream OS(IndexFileName, EC, llvm::sys::fs::F_Text);
-  OS << IndexText;
-  OS.flush();
+
+  int IndexFD;
+  llvm::SmallString<256> IndexFileName;
+  ASSERT_FALSE(llvm::sys::fs::createTemporaryFile("index", "txt", IndexFD,
+                                                  IndexFileName));
+  llvm::tool_output_file IndexFile(IndexFileName, IndexFD);
+  IndexFile.os() << IndexText;
+  IndexFile.os().flush();
   EXPECT_TRUE(llvm::sys::fs::exists(IndexFileName));
   llvm::Expected<llvm::StringMap<std::string>> IndexOrErr =
       parseCrossTUIndex(IndexFileName, "");
@@ -117,7 +132,6 @@ TEST(CrossTranslationUnit, IndexFormatCanBeParsed) {
   }
   for (const auto &E : ParsedIndex)
     EXPECT_TRUE(Index.count(E.getKey()));
-  EXPECT_FALSE((bool)llvm::sys::fs::remove(IndexFileName));
 }
 
 } // end namespace cross_tu
