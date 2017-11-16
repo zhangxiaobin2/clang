@@ -141,6 +141,7 @@ namespace clang {
                            bool Complain = true);
     bool IsStructuralMatch(EnumDecl *FromEnum, EnumDecl *ToRecord,
                            bool Complain = true);
+    bool IsStructuralMatch(FunctionDecl *From, FunctionDecl *To);
     bool IsStructuralMatch(FunctionTemplateDecl *From, FunctionTemplateDecl *To);
     bool IsStructuralMatch(EnumConstantDecl *FromEC, EnumConstantDecl *ToEC);
     bool IsStructuralMatch(ClassTemplateDecl *From, ClassTemplateDecl *To);
@@ -1356,6 +1357,13 @@ bool ASTNodeImporter::IsStructuralMatch(FunctionTemplateDecl *From,
   return Ctx.IsStructurallyEquivalent(From, To);
 }
 
+bool ASTNodeImporter::IsStructuralMatch(FunctionDecl *From, FunctionDecl *To) {
+  StructuralEquivalenceContext Ctx(
+      Importer.getFromContext(), Importer.getToContext(),
+      Importer.getNonEquivalentDecls(), false, false);
+  return Ctx.IsStructurallyEquivalent(From, To);
+}
+
 bool ASTNodeImporter::IsStructuralMatch(EnumConstantDecl *FromEC,
                                         EnumConstantDecl *ToEC)
 {
@@ -2138,8 +2146,7 @@ Decl *ASTNodeImporter::VisitFunctionDecl(FunctionDecl *D) {
       if (FunctionDecl *FoundFunction = dyn_cast<FunctionDecl>(FoundDecls[I])) {
         if (FoundFunction->hasExternalFormalLinkage() &&
             D->hasExternalFormalLinkage()) {
-          if (Importer.IsStructurallyEquivalent(D->getType(), 
-                                                FoundFunction->getType())) {
+          if (IsStructuralMatch(D, FoundFunction)) {
             // FIXME: Actually try to merge the body and other attributes.
             const FunctionDecl *FromBodyDecl = nullptr;
             D->hasBody(FromBodyDecl);
@@ -2311,6 +2318,12 @@ Decl *ASTNodeImporter::VisitFunctionDecl(FunctionDecl *D) {
       return nullptr;
     ToFunction->setType(T);
   }
+
+  // Import the describing template function, if any.
+  if (FunctionTemplateDecl *FromFT = D->getDescribedFunctionTemplate())
+    if (auto *ToFT = dyn_cast<FunctionTemplateDecl>(Importer.Import(FromFT))) {
+      ToFunction->setDescribedFunctionTemplate(ToFT);
+    }
 
   // Import the body, if any.
   if (Stmt *FromBody = D->getBody()) {
@@ -4316,6 +4329,11 @@ Decl *ASTNodeImporter::VisitFunctionTemplateDecl(FunctionTemplateDecl *D) {
   if (ToD)
       return ToD;
 
+  FunctionDecl *TemplatedFD =
+      cast_or_null<FunctionDecl>(Importer.Import(D->getTemplatedDecl()));
+  if (!TemplatedFD)
+    return nullptr;
+
   // Try to find a function in our own ("to") context with the same name, same
   // type, and in the same context as the function we're importing.
   if (!LexicalDC->isFunctionOrMethod()) {
@@ -4343,11 +4361,6 @@ Decl *ASTNodeImporter::VisitFunctionTemplateDecl(FunctionTemplateDecl *D) {
   TemplateParameterList *Params = ImportTemplateParameterList(
                                     D->getTemplateParameters());
   if (!Params)
-    return nullptr;
-
-  FunctionDecl *TemplatedFD = cast_or_null<FunctionDecl>(
-		                 Importer.Import(D->getTemplatedDecl()));
-  if (!TemplatedFD)
     return nullptr;
 
   FunctionTemplateDecl *ToFunc = FunctionTemplateDecl::Create(
@@ -4980,8 +4993,8 @@ Expr *ASTNodeImporter::VisitDeclRefExpr(DeclRefExpr *E) {
   if (T.isNull())
     return nullptr;
 
-
-  TemplateArgumentListInfo ToTAInfo;
+  TemplateArgumentListInfo ToTAInfo(Importer.Import(E->getLAngleLoc()),
+                                    Importer.Import(E->getRAngleLoc()));
   TemplateArgumentListInfo *ResInfo = nullptr;
   if (E->hasExplicitTemplateArgs()) {
     for (const auto &FromLoc : E->template_arguments()) {
@@ -5911,18 +5924,25 @@ Expr *ASTNodeImporter::VisitMemberExpr(MemberExpr *E) {
     Importer.Import(E->getMemberNameInfo().getName()),
     Importer.Import(E->getMemberNameInfo().getLoc()));
 
+  TemplateArgumentListInfo ToTAInfo(Importer.Import(E->getLAngleLoc()),
+                                    Importer.Import(E->getRAngleLoc()));
+  TemplateArgumentListInfo *ResInfo = nullptr;
   if (E->hasExplicitTemplateArgs()) {
-    return nullptr; // FIXME: handle template arguments
+    for (const auto &FromLoc : E->template_arguments()) {
+      if (auto ToTALoc = ImportTemplateArgumentLoc(FromLoc)) {
+        ToTAInfo.addArgument(*ToTALoc);
+      } else
+        return nullptr;
+    }
+    ResInfo = &ToTAInfo;
   }
 
-  return MemberExpr::Create(Importer.getToContext(), ToBase,
-                            E->isArrow(),
+  return MemberExpr::Create(Importer.getToContext(), ToBase, E->isArrow(),
                             Importer.Import(E->getOperatorLoc()),
                             Importer.Import(E->getQualifierLoc()),
                             Importer.Import(E->getTemplateKeywordLoc()),
-                            ToMember, ToFoundDecl, ToMemberNameInfo,
-                            nullptr, T, E->getValueKind(),
-                            E->getObjectKind());
+                            ToMember, ToFoundDecl, ToMemberNameInfo, ResInfo, T,
+                            E->getValueKind(), E->getObjectKind());
 }
 
 Expr *ASTNodeImporter::VisitCXXDependentScopeMemberExpr(
@@ -5936,7 +5956,8 @@ Expr *ASTNodeImporter::VisitCXXDependentScopeMemberExpr(
   if (!E->getBaseType().isNull() && BaseType.isNull())
     return nullptr;
 
-  TemplateArgumentListInfo ToTAInfo;
+  TemplateArgumentListInfo ToTAInfo(Importer.Import(E->getLAngleLoc()),
+                                    Importer.Import(E->getRAngleLoc()));
   TemplateArgumentListInfo *ResInfo = nullptr;
   if (E->hasExplicitTemplateArgs()) {
     for (const auto &FromLoc : E->template_arguments()) {
@@ -5976,7 +5997,8 @@ ASTNodeImporter::VisitDependentScopeDeclRefExpr(DependentScopeDeclRefExpr *E) {
 
   ImportDeclarationNameLoc(E->getNameInfo(), NameInfo);
 
-  TemplateArgumentListInfo ToTAInfo;
+  TemplateArgumentListInfo ToTAInfo(Importer.Import(E->getLAngleLoc()),
+                                    Importer.Import(E->getRAngleLoc()));
   TemplateArgumentListInfo *ResInfo = nullptr;
   if (E->hasExplicitTemplateArgs()) {
     for (const auto &FromLoc : E->template_arguments()) {
@@ -6042,7 +6064,8 @@ Expr *ASTNodeImporter::VisitUnresolvedLookupExpr(UnresolvedLookupExpr *E) {
       return nullptr;
   }
 
-  TemplateArgumentListInfo ToTAInfo;
+  TemplateArgumentListInfo ToTAInfo(Importer.Import(E->getLAngleLoc()),
+                                    Importer.Import(E->getRAngleLoc()));
   TemplateArgumentListInfo *ResInfo = nullptr;
   if (E->hasExplicitTemplateArgs()) {
     for (const auto &FromLoc : E->template_arguments()) {
