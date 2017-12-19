@@ -41,6 +41,10 @@ class LocationContext;
 
 namespace idx { class TranslationUnit; }
 
+namespace cross_tu {
+class CrossTranslationUnitContext;
+}
+
 /// The base class of a hierarchy of objects representing analyses tied
 /// to AnalysisDeclContext.
 class ManagedAnalysis {
@@ -426,16 +430,20 @@ class AnalysisDeclContextManager {
   /// for well-known functions.
   bool SynthesizeBodies;
 
+  cross_tu::CrossTranslationUnitContext *CTU;
+  StringRef CTUDir;
+
+
 public:
-  AnalysisDeclContextManager(ASTContext &ASTCtx, bool useUnoptimizedCFG = false,
-                             bool addImplicitDtors = false,
-                             bool addInitializers = false,
-                             bool addTemporaryDtors = false,
-                             bool addLifetime = false, bool addLoopExit = false,
-                             bool synthesizeBodies = false,
-                             bool addStaticInitBranches = false,
-                             bool addCXXNewAllocator = true,
-                             CodeInjector *injector = nullptr);
+  AnalysisDeclContextManager(
+      ASTContext &ASTCtx, bool useUnoptimizedCFG = false,
+      bool addImplicitDtors = false, bool addInitializers = false,
+      bool addTemporaryDtors = false, bool addLifetime = false,
+      bool addLoopExit = false, bool synthesizeBodies = false,
+      bool addStaticInitBranches = false, bool addCXXNewAllocator = true,
+      CodeInjector *injector = nullptr,
+      cross_tu::CrossTranslationUnitContext *CTU = nullptr,
+      StringRef CTUDir = "");
 
   AnalysisDeclContext *getContext(const Decl *D);
 
@@ -473,6 +481,15 @@ public:
                                          unsigned Idx) {
     return LocContexts.getStackFrame(getContext(D), Parent, S, Blk, Idx);
   }
+
+  cross_tu::CrossTranslationUnitContext *getCrossTranslationUnitContext() {
+    return CTU;
+  }
+
+  StringRef getCrossTranslationUnitDir() {
+    return CTUDir;
+  }
+
 
   /// Get a reference to {@code BodyFarm} instance.
   BodyFarm &getBodyFarm();

@@ -26,6 +26,7 @@
 #include "clang/Analysis/CFG.h"
 #include "clang/Analysis/CFGStmtMap.h"
 #include "clang/Analysis/Support/BumpVector.h"
+#include "clang/CrossTU/CrossTranslationUnit.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -67,9 +68,11 @@ AnalysisDeclContextManager::AnalysisDeclContextManager(
     ASTContext &ASTCtx, bool useUnoptimizedCFG, bool addImplicitDtors,
     bool addInitializers, bool addTemporaryDtors, bool addLifetime,
     bool addLoopExit, bool synthesizeBodies, bool addStaticInitBranch,
-    bool addCXXNewAllocator, CodeInjector *injector)
+    bool addCXXNewAllocator, CodeInjector *injector,
+    cross_tu::CrossTranslationUnitContext *CTU,
+    StringRef CTUDir)
     : Injector(injector), FunctionBodyFarm(ASTCtx, injector),
-      SynthesizeBodies(synthesizeBodies) {
+      SynthesizeBodies(synthesizeBodies), CTU(CTU), CTUDir(CTUDir) {
   cfgBuildOptions.PruneTriviallyFalseEdges = !useUnoptimizedCFG;
   cfgBuildOptions.AddImplicitDtors = addImplicitDtors;
   cfgBuildOptions.AddInitializers = addInitializers;
@@ -95,7 +98,8 @@ Stmt *AnalysisDeclContext::getBody(bool &IsAutosynthesized) const {
         IsAutosynthesized = true;
       }
     }
-    return Body;
+    if (Body)
+      return Body;
   }
   else if (const ObjCMethodDecl *MD = dyn_cast<ObjCMethodDecl>(D)) {
     Stmt *Body = MD->getBody();
@@ -107,13 +111,34 @@ Stmt *AnalysisDeclContext::getBody(bool &IsAutosynthesized) const {
       }
     }
     return Body;
-  } else if (const BlockDecl *BD = dyn_cast<BlockDecl>(D))
+  } else if (const BlockDecl *BD = dyn_cast<BlockDecl>(D)) {
     return BD->getBody();
+  }
   else if (const FunctionTemplateDecl *FunTmpl
-           = dyn_cast_or_null<FunctionTemplateDecl>(D))
-    return FunTmpl->getTemplatedDecl()->getBody();
+           = dyn_cast_or_null<FunctionTemplateDecl>(D)) {
+    if (FunTmpl->getTemplatedDecl()->hasBody())
+      return FunTmpl->getTemplatedDecl()->getBody();
+  }
+  else
+    llvm_unreachable("unknown code decl");
 
-  llvm_unreachable("unknown code decl");
+  if (cross_tu::CrossTranslationUnitContext *CTUCtx =
+          Manager->getCrossTranslationUnitContext()) {
+    llvm::Expected<const FunctionDecl *> CTUDeclOrError =
+        CTUCtx->getCrossTUDefinition(cast<FunctionDecl>(D),
+                                     Manager->getCrossTranslationUnitDir(),
+                                     "externalFnMap.txt");
+
+    if (!CTUDeclOrError) {
+      handleAllErrors(CTUDeclOrError.takeError(),
+                      [&](const cross_tu::IndexError &IE) {
+                        CTUCtx->emitCrossTUDiagnostics(IE);
+                      });
+      return nullptr;
+    }
+    return (*CTUDeclOrError)->getBody();
+  }
+  return nullptr;
 }
 
 Stmt *AnalysisDeclContext::getBody() const {
@@ -616,4 +641,3 @@ void LocationContextManager::clear() {
 
   Contexts.clear();
 }
-

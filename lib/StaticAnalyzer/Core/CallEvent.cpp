@@ -16,7 +16,6 @@
 #include "clang/StaticAnalyzer/Core/PathSensitive/CallEvent.h"
 #include "clang/AST/ParentMap.h"
 #include "clang/Analysis/ProgramPoint.h"
-#include "clang/CrossTU/CrossTranslationUnit.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/CheckerContext.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/DynamicTypeMap.h"
 #include "llvm/ADT/SmallSet.h"
@@ -353,38 +352,24 @@ RuntimeDefinition AnyFunctionCall::getRuntimeDefinition() const {
   const FunctionDecl *FD = getDecl();
   // Note that the AnalysisDeclContext will have the FunctionDecl with
   // the definition (if one exists).
-  if (!FD)
-    return RuntimeDefinition();
-
-  AnalysisDeclContext *AD =
-    getLocationContext()->getAnalysisDeclContext()->
-    getManager()->getContext(FD);
-  if (AD->getBody())
-    return RuntimeDefinition(AD->getDecl());
-
-  auto Engine = static_cast<ExprEngine *>(
-      getState()->getStateManager().getOwningEngine());
-
-  //Try to get CTU definition only if CTUDir is provided.
-  if (Engine->getAnalysisManager().options.getCTUDir().empty())
-    return RuntimeDefinition();
-
-  cross_tu::CrossTranslationUnitContext &CTUCtx =
-      Engine->getCrossTranslationUnitContext();
-  llvm::Expected<const FunctionDecl *> CTUDeclOrError =
-      CTUCtx.getCrossTUDefinition(
-          FD, Engine->getAnalysisManager().options.getCTUDir(),
-          "externalFnMap.txt");
-
-  if (!CTUDeclOrError) {
-    handleAllErrors(CTUDeclOrError.takeError(),
-                    [&](const cross_tu::IndexError &IE) {
-                      CTUCtx.emitCrossTUDiagnostics(IE);
-                    });
-    return RuntimeDefinition();
+  if (FD) {
+    AnalysisDeclContext *AD =
+      getLocationContext()->getAnalysisDeclContext()->
+      getManager()->getContext(FD);
+    bool IsAutosynthesized;
+    Stmt* Body = AD->getBody(IsAutosynthesized);
+    DEBUG({
+        if (IsAutosynthesized)
+          llvm::dbgs() << "Using autosynthesized body for " << FD->getName()
+                       << "\n";
+    });
+    if (Body) {
+      const Decl* Decl = AD->getDecl();
+      return RuntimeDefinition(Decl);
+    }
   }
 
-  return RuntimeDefinition(*CTUDeclOrError);
+  return RuntimeDefinition();
 }
 
 void AnyFunctionCall::getInitialStackFrameContents(

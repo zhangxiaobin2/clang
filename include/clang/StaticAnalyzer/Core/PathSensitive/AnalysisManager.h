@@ -25,6 +25,10 @@ namespace clang {
 
 class CodeInjector;
 
+namespace cross_tu {
+class CrossTranslationUnitContext;
+}
+
 namespace ento {
   class CheckerManager;
 
@@ -53,7 +57,8 @@ public:
                   ConstraintManagerCreator constraintmgr, 
                   CheckerManager *checkerMgr,
                   AnalyzerOptions &Options,
-                  CodeInjector* injector = nullptr);
+                  CodeInjector *injector = nullptr,
+                  cross_tu::CrossTranslationUnitContext *CTU = nullptr);
 
   ~AnalysisManager() override;
 
