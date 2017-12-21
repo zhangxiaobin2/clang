@@ -149,9 +149,11 @@ if mainargs.record_memprof:
 
 analyzer_params = []
 if mainargs.enabled_checkers:
-    analyzer_params += ['-analyzer-checker'] + mainargs.enabled_checkers
+    for checker in mainargs.enabled_checkers:
+        analyzer_params += ['-analyzer-checker', checker]
 if mainargs.disabled_checkers:
-    analyzer_params += ['-analyzer-disable-checker'] + mainargs.disable_checkers
+    for checker in mainargs.enabled_checkers:
+        analyzer_params += ['-analyzer-disable-checker', checker]
 if mainargs.reparse:
     analyzer_params += ['-analyzer-config',
                         'xtu-reparse='+os.path.abspath(mainargs.buildlog)]
