@@ -1,7 +1,8 @@
-#!/usr/bin/env python# This script is used to deal compilation database json file
+#!/usr/bin/env python
+# This script is used to deal compilation database json file
 # The major use is to translate "arguments" to "command" in the cdb json file
 #
-#project: https://github.com/rizsotto/Bear
+# project: https://github.com/rizsotto/Bear
 # is a tool that capture compile command with gnu make(not cmake),
 # and create the compilation database json file with field "arguments"(not "command").
 # xtu-build.py and xtu-analyze.py does not support field "arguments" in the cdb json file,
