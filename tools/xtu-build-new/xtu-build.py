@@ -13,6 +13,13 @@ import string
 import shlex
 import shutil
 import tempfile
+import sys
+
+sys.path.append(os.path.join(os.path.dirname(__file__), 'lib'))
+try:
+    import deal_compilation_database
+except:
+    raise
 
 threading_factor = int(multiprocessing.cpu_count() * 1.5)
 timeout = 86400
@@ -106,15 +113,7 @@ cmd_2_src = {}
 cmd_order = []
 for step in buildlog:
     if src_pattern.match(step['file']):
-        if 'command' not in step:
-            if 'arguments' in step:
-                # change arguments to command
-                command_from_arg = get_command_from_arguments(step['arguments'])
-                step['command'] = command_from_arg
-            else:
-                print "have no field \"command\" and \"arguments\" to deal, exit..."
-                exit(2)
-                
+        deal_compilation_database.translate_arguments_to_command(step)
         if step['file'] not in src_2_dir:
             src_2_dir[step['file']] = step['directory']
         if step['file'] not in src_2_cmd:
