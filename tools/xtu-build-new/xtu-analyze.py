@@ -25,6 +25,14 @@ try:
     import MergeCoverage
 except:
     raise
+    
+    
+sys.path.append(os.path.join(os.path.dirname(__file__), 'lib'))
+try:
+    import deal_compilation_database
+except:
+    raise
+
 
 threading_factor = int(multiprocessing.cpu_count() * 1.0)
 # timeout = 86400
@@ -203,15 +211,7 @@ passed_buildlog = []
 dircmd_2_original_orders = {}
 for step in buildlog:
     if src_pattern.match(step['file']):
-        if 'command' not in step:
-            if 'arguments' in step:
-                # change arguments to command
-                command_from_arg = get_command_from_arguments(step['arguments'])
-                step['command'] = command_from_arg
-            else:
-                print "have no field \"command\" and \"arguments\" to deal, exit..."
-                exit(2)
-                
+        deal_compilation_database.translate_arguments_to_command(step)
         uid = step['directory'] + dircmd_separator + step['command']
         if uid not in dircmd_2_orders:
             dircmd_2_orders[uid] = [src_build_steps]
