@@ -90,15 +90,6 @@ def check_executable_available(exe_name, arg_path):
             'argument' if arg_path is not None else 'environment')
     return found_path
 
-def get_command_from_arguments(arguments):
-    command_tmp = ""
-    arguments.reverse()
-    while len(arguments) > 0:
-        opt = arguments.pop()
-        command_tmp += opt + " "
-    command_tmp.rstrip(" ")
-    return command_tmp
-
 clang_path = check_executable_available('clang', mainargs.clang_path)
 
 buildlog_file = open(mainargs.buildlog, 'r')
