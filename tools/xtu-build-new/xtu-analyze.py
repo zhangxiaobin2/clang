@@ -25,14 +25,12 @@ try:
     import MergeCoverage
 except:
     raise
-    
-    
+       
 sys.path.append(os.path.join(os.path.dirname(__file__), 'lib'))
 try:
     import deal_compilation_database
 except:
     raise
-
 
 threading_factor = int(multiprocessing.cpu_count() * 1.0)
 # timeout = 86400
@@ -143,15 +141,6 @@ def check_executable_available(exe_name, arg_path):
             found_path,
             'argument' if arg_path is not None else 'environment')
     return found_path
-
-def get_command_from_arguments(arguments):
-    command_tmp = ""
-    arguments.reverse()
-    while len(arguments) > 0:
-        opt = arguments.pop()
-        command_tmp += opt + " "
-    command_tmp.rstrip(" ")
-    return command_tmp  
 
 clang_path = check_executable_available('clang', mainargs.clang_path)
 analyze_path = check_executable_available('analyze-cc', mainargs.analyze_path)
